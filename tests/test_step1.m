@@ -23,10 +23,10 @@ fprintf('\nTest 1-2: 설정 필드 확인\n');
 
 required_fields = {
     'num_STAs', 'numRU_RA', 'numRU_SA', 'numRU_total', ...
-    'simulation_time', 'warmup_time', 'stage_duration', ...
+    'simulation_time', 'warmup_time',  ...
     'lambda', 'alpha', 'rho', 'L_cell', ...
     'OCW_min', 'OCW_max', 'scheme_id', ...
-    'verbose', 'collect_stage_metrics'
+    'verbose', 'collect_bsr_trace'
 };
 
 missing_fields = {};
@@ -49,7 +49,6 @@ assert(cfg.num_STAs > 0, 'num_STAs must be positive');
 assert(cfg.numRU_RA >= 1, 'numRU_RA must be >= 1');
 assert(cfg.numRU_SA >= 1, 'numRU_SA must be >= 1');
 assert(cfg.simulation_time > cfg.warmup_time, 'sim_time > warmup_time');
-assert(cfg.stage_duration > 0, 'stage_duration must be positive');
 assert(cfg.alpha > 1, 'alpha must be > 1 for Pareto');
 assert(cfg.rho > 0 && cfg.rho < 1, 'rho must be in (0,1)');
 assert(cfg.L_cell > 0 && cfg.L_cell <= 1, 'L_cell must be in (0,1]');

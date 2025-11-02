@@ -123,7 +123,6 @@ metrics = init_metrics_struct(cfg);
 % 상위 레벨 필드 확인
 assert(isfield(metrics, 'cumulative'), 'Missing cumulative');
 assert(isfield(metrics, 'packet_level'), 'Missing packet_level');
-assert(isfield(metrics, 'stage_level'), 'Missing stage_level');
 assert(isfield(metrics, 'policy_level'), 'Missing policy_level');
 
 % Cumulative 메트릭
@@ -136,17 +135,9 @@ assert(length(metrics.packet_level.queuing_delays) == cfg.max_delays, ...
     'queuing_delays size mismatch');
 assert(metrics.packet_level.delay_idx == 0, 'Initial delay_idx != 0');
 
-% Stage-level 메트릭
-if cfg.collect_stage_metrics
-    assert(length(metrics.stage_level.ra_collision) == cfg.max_stages, ...
-        'ra_collision size mismatch');
-    assert(metrics.stage_level.stage_idx == 0, 'Initial stage_idx != 0');
-end
-
 fprintf('  Metrics 초기화 성공\n');
 fprintf('    - Cumulative: ✓\n');
 fprintf('    - Packet-level: ✓\n');
-fprintf('    - Stage-level: ✓\n');
 fprintf('    - Policy-level: ✓\n');
 
 %% Test 2-5: 메모리 사전 할당 확인
@@ -159,11 +150,6 @@ assert(length(STAs(1).packet_queuing_delays) == cfg.max_delays, ...
 % Metrics
 assert(length(metrics.packet_level.queuing_delays) == cfg.max_delays, ...
     'Metrics delays not pre-allocated');
-
-if cfg.collect_stage_metrics
-    assert(length(metrics.stage_level.ra_collision) == cfg.max_stages, ...
-        'Stage metrics not pre-allocated');
-end
 
 fprintf('  메모리 사전 할당 확인\n');
 

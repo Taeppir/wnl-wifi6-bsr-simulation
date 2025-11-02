@@ -38,7 +38,7 @@ function cfg = config_default()
     % ⭐ 워밍업 시간 [sec]
     cfg.warmup_time = 2.0;
     
-    % [삭제] cfg.stage_duration: 이벤트 기반 모델에서는 사용되지 않음
+
     
     %% =====================================================================
     %  PHY 파라미터 (⭐이벤트 기반용 시간 추가)
@@ -117,7 +117,6 @@ function cfg = config_default()
     %  메트릭 수집
     %  =====================================================================
     
-    cfg.collect_stage_metrics = true;
     cfg.collect_bsr_trace = true;
     
     %% =====================================================================
@@ -127,13 +126,11 @@ function cfg = config_default()
     cfg.max_packets_per_sta = 10000;
     cfg.max_delays = 50000;
     
-    % [삭제] cfg.max_stages: 이벤트 기반 모델에서는 사용되지 않음
     
     if cfg.verbose >= 2
         fprintf('\n[사전 할당 크기]\n');
         fprintf('  단말당 최대 패킷: %d개\n', cfg.max_packets_per_sta);
         fprintf('  최대 지연 샘플: %d개\n', cfg.max_delays);
-        % [수정] 예상 메모리 계산에서 max_stages 제거
         fprintf('  예상 메모리: %.2f MB\n', (cfg.max_delays * 8) / 1e6);
     end
 end

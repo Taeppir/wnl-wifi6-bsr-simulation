@@ -183,8 +183,6 @@ function results = main_sim_v2(cfg)
                 end
             end
             
-            % (TODO: BSR policy/stage level collection)
-            
         end % if ~is_warmup
         
     end % while loop

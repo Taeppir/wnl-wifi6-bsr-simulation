@@ -11,8 +11,7 @@ function metrics = init_metrics_struct(cfg)
 %   - cumulative: 누적 통계
 %   - packet_level: 패킷별 메트릭
 %   - policy_level: 정책 분석용 메트릭
-%
-% (수정: 'stage_level'은 이벤트 기반 모델과 호환되지 않아 제거됨)
+
 
     metrics = struct();
     
@@ -56,22 +55,10 @@ function metrics = init_metrics_struct(cfg)
     
     % 분할 전송 지연
     metrics.packet_level.frag_delays = nan(max_delays, 1);
-    metrics.packet_level.frag_idx = 0;
+    metrics.packet_level.frag_idx = 0;  
     
     %% =====================================================================
-    %  3. Stage-level 메트릭 (이벤트 기반 모델에서는 사용 안 함)
-    %  =====================================================================
-    
-    % 'cfg.max_stages'가 config_default.m에서 제거되었으므로
-    % 'stage_level' 메트릭 수집 로직 전체를 비활성화합니다.
-    % 'main_sim_v2.m'의 루프는 'stage'가 아닌 'event' 기반입니다.
-    
-    metrics.stage_level = struct();
-    metrics.stage_level.stage_idx = 0; % (참조 오류 방지를 위한 빈 구조체)
-    
-    
-    %% =====================================================================
-    %  4. Policy-level 메트릭 (BSR 정책 분석)
+    %  3. Policy-level 메트릭 (BSR 정책 분석)
     %  =====================================================================
     
     if cfg.collect_bsr_trace

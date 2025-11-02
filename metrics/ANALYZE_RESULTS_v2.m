@@ -144,8 +144,6 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
          warning('ANALYZE_RESULTS_v2: main_sim_v2.m에서 total_uora_idle 누적이 필요합니다.');
     end
     
-    % ⭐ [수정] total_ru_opportunities 계산 방식 변경
-    % cfg.stage_duration을 사용하지 않고, 실제 발생한 이벤트(슬롯)의 총합으로 계산
     total_ru_opportunities = results.uora.total_success + ...
                              results.uora.total_collisions + ...
                              results.uora.total_idle;
