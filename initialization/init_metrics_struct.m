@@ -65,7 +65,7 @@ function metrics = init_metrics_struct(cfg)
         metrics.policy_level = struct();
         
         % max_samples는 max_stages와 무관하므로 그대로 둡니다.
-        max_samples = 50000;
+        max_samples = 20000;
 
         metrics.policy_level.trace = struct(...
         'time', nan(max_samples, 1), ...

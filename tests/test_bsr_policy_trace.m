@@ -30,7 +30,7 @@ cfg_base.num_STAs = 20;           % STA 1개에 집중
 cfg_base.simulation_time = 10; % 10초
 cfg_base.verbose = 0;            % (로그 최소화)
 cfg_base.collect_bsr_trace = true; % (트레이스 활성화)
-cfg_base.L_cell = 0.3;
+cfg_base.L_cell = 0.2;
 % -------------------------
 
 % 동일한 트래픽/경쟁을 위한 난수 시드 고정
