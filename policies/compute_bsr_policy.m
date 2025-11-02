@@ -1,4 +1,4 @@
-function [R, STAs] = compute_bsr_policy(STAs, sta_idx, Q_current, current_time, cfg)
+function [R, STAs, metrics] = compute_bsr_policy(STAs, sta_idx, Q_current, current_time, cfg, metrics)
 % COMPUTE_BSR_POLICY: BSR 정책 라우터
 %
 % 입력:

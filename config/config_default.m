@@ -64,7 +64,7 @@ function cfg = config_default()
     
     cfg.alpha = 1.5;
     cfg.mu_on = 0.05;
-    cfg.mu_off = 0.01;
+    cfg.mu_off = 0.05;
     cfg.rho = cfg.mu_on / (cfg.mu_on + cfg.mu_off);
     
     total_capacity = cfg.numRU_SA * cfg.data_rate_per_RU;
