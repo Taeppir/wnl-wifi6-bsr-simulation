@@ -1,4 +1,4 @@
-function results = main_sim_v2(cfg)
+function [results, metrics] = main_sim_v2(cfg)
 % MAIN_SIM_EVENT: IEEE 802.11ax 상향링크 시뮬레이션 (이벤트 기반)
 %
 % 'main_sim.m'의 이벤트 기반 루프와 'main_sim_v2.m'의
@@ -108,7 +108,7 @@ function results = main_sim_v2(cfg)
         tx_complete_time = t_next; % 전송 완료 시각
         
         % ⭐ v2 함수 호출
-        [STAs, AP, RUs, tx_log] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg);
+        [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg, metrics);
         
         current_time = tx_complete_time;
         

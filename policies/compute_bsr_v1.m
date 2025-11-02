@@ -35,8 +35,13 @@ function [R, STAs] = compute_bsr_v1(STAs, sta_idx, Q_current, cfg)
         % 버스트 또는 작은 큐 → 감소 안 함
         R = Q_current;
     else
-        % 고정량 감소
-        R = max(0, Q_current - fixed_reduction);
+        if delta_Q <= 0
+            % 고정량 감소
+            R = max(0, Q_current - fixed_reduction);
+        else
+            % 증가 추세이면 R=Q
+            R = Q_current;
+        end
     end
     
     % 상태 업데이트

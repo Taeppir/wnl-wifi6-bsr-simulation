@@ -1,4 +1,4 @@
-function [STAs, AP, RUs, tx_log] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg)
+function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg, metrics)
 % UL_TRANSMITTING_V2: 상향링크 전송 (RA-RU + SA-RU 통합)
 %
 % 입력:
@@ -65,7 +65,7 @@ function [STAs, AP, RUs, tx_log] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete
             
             if Q_current > 0
                 % BSR 정책 적용
-                [R_explicit, STAs] = compute_bsr_policy(STAs, sta_idx, Q_current, cfg);
+                [R_explicit, STAs, metrics] = compute_bsr_policy(STAs, sta_idx, Q_current, tx_complete_time, cfg, metrics);
                 
                 % BSR + mode 업데이트
                 [STAs, AP] = UPDATE_BSR_AND_MODE(STAs, AP, sta_idx, R_explicit);
@@ -161,7 +161,7 @@ function [STAs, AP, RUs, tx_log] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete
         remaining_buffer = sum([STAs(sta_idx).Queue.remaining_size]);
         
         % BSR 정책 적용
-        [R_implicit, STAs] = compute_bsr_policy(STAs, sta_idx, remaining_buffer, cfg);
+        [R_implicit, STAs, metrics] = compute_bsr_policy(STAs, sta_idx, remaining_buffer,tx_complete_time, cfg, metrics);
         
         % BSR + mode 업데이트
         [STAs, AP] = UPDATE_BSR_AND_MODE(STAs, AP, sta_idx, R_implicit);
