@@ -1,4 +1,4 @@
-function [R, STAs] = compute_bsr_policy(STAs, sta_idx, Q_current, cfg)
+function [R, STAs] = compute_bsr_policy(STAs, sta_idx, Q_current, current_time, cfg)
 % COMPUTE_BSR_POLICY: BSR 정책 라우터
 %
 % 입력:
@@ -44,4 +44,19 @@ function [R, STAs] = compute_bsr_policy(STAs, sta_idx, Q_current, cfg)
     
     % R은 Q를 초과할 수 없음 (conservative reporting)
     R = min(R, Q_current);
+
+    % 로깅 코드
+    if cfg.collect_bsr_trace
+        idx = metrics.policy_level.trace_idx + 1;
+        if idx <= length(metrics.policy_level.trace.time)
+            metrics.policy_level.trace.time(idx) = current_time;
+            metrics.policy_level.trace.sta_id(idx) = sta_idx;
+            metrics.policy_level.trace.Q(idx) = Q_current;
+            metrics.policy_level.trace.R(idx) = R;
+            if cfg.scheme_id == 3
+                metrics.policy_level.trace.Q_ema(idx) = STAs(sta_idx).Q_ema;
+            end
+            metrics.policy_level.trace_idx = idx;
+        end
+    end
 end

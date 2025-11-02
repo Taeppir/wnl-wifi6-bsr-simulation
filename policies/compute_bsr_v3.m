@@ -11,15 +11,12 @@ function [R, STAs] = compute_bsr_v3(STAs, sta_idx, Q_current, cfg)
 %   R    - 보고할 BSR 값 [bytes]
 %   STAs - 업데이트된 단말 구조체
 %
-% 로직:
+% 로직: (2025.11.03 수정)
 %   1. EMA 업데이트: Q_ema(t) = α·Q(t) + (1-α)·Q_ema(t-1)
 %   2. Deviation 계산: dev = Q(t) - Q_ema(t)
-%   3. 버스트 감지: dev > threshold
-%   4. 버스트 아니면:
-%      - dev > 0 (큐가 증가 추세): 덜 감소
-%      - dev < 0 (큐가 감소 추세): 많이 감소
-%   5. reduction_ratio = sensitivity * |dev| / Q(t)
-%   6. R = Q * (1 - reduction_ratio)
+%   3. 공통 안전장치 (버스트/작은 큐) 확인
+%   4. [수정] 하락 추세(dev <= 0)일 때만 감산 적용
+%   5. [수정] 상승 추세(dev > 0)일 때는 R = Q (감산 없음)
 
     % 상태 변수 읽기
     Q_prev = STAs(sta_idx).Q_prev;
@@ -48,6 +45,7 @@ function [R, STAs] = compute_bsr_v3(STAs, sta_idx, Q_current, cfg)
     %  =====================================================================
     
     % EMA 공식: Q_ema(t) = α·Q(t) + (1-α)·Q_ema(t-1)
+    % (참고: policies/update_ema_helper.m와 동일한 로직)
     Q_ema_new = alpha * Q_current + (1 - alpha) * Q_ema;
     
     %% =====================================================================
@@ -60,52 +58,44 @@ function [R, STAs] = compute_bsr_v3(STAs, sta_idx, Q_current, cfg)
     deviation = Q_current - Q_ema_new;
     
     %% =====================================================================
-    %  Step 4: 버스트 감지 (급격한 증가)
+    %  Step 4: 공통 안전장치 (버스트 및 작은 큐 보호)
     %  =====================================================================
     
+    % 1. 버스트 감지 (급격한 증가)
     delta_Q = Q_current - Q_prev;
     is_burst = (delta_Q > burst_threshold);
     
-    % 또는 deviation 기반 버스트 감지
-    % is_burst = (deviation > burst_threshold);
-    
-    % 큐가 너무 작으면 감소 안 함
+    % 2. 큐가 너무 작으면 감소 안 함
     is_small_queue = (Q_current < reduction_threshold);
     
     %% =====================================================================
-    %  Step 5: 감소 비율 계산
+    %  Step 5: 감소 비율 계산 [핵심 수정]
     %  =====================================================================
     
     if is_burst || is_small_queue
-        % 버스트 또는 작은 큐 → 감소 안 함
+        % [안전장치] 버스트 또는 작은 큐 → 감산 안 함 (R=Q)
         reduction_ratio = 0;
         
     else
-        % deviation 기반 감소
+        % [수정] 정책 로직: 설계안에 따라 하락 추세일 때만 감산
         
-        if deviation > 0
-            % 큐가 증가 추세 → 보수적으로 감소
-            % deviation이 클수록 덜 감소 (새 패킷이 많이 들어옴)
+        if deviation <= 0
+            % [수정] 큐가 하락 추세 (Q <= Q_ema) → 적극적으로 감소
+            % (이전 코드의 'else' 블록 로직)
             
-            % 정규화: deviation / Q_current
-            normalized_dev = deviation / max(Q_current, 1);
-            
-            % sensitivity로 스케일링
-            reduction_ratio = sensitivity * normalized_dev;
-            
-            % 상한 적용
-            reduction_ratio = min(reduction_ratio, max_reduction * 0.5);  % 절반만
-            
-        else
-            % 큐가 감소 추세 → 적극적으로 감소
             % |deviation|이 클수록 더 많이 감소
-            
+            % (Q_current가 0에 가까울 때 분모가 0이 되는 것을 방지)
             normalized_dev = abs(deviation) / max(Q_current, 1);
             
             reduction_ratio = sensitivity * normalized_dev;
             
             % 상한 적용
             reduction_ratio = min(reduction_ratio, max_reduction);
+            
+        else
+            % [수정] 큐가 상승 추세 (Q > Q_ema) → 감산 안 함 (R=Q)
+            % (ON 구간 진입으로 판단)
+            reduction_ratio = 0;
         end
     end
     
@@ -113,9 +103,12 @@ function [R, STAs] = compute_bsr_v3(STAs, sta_idx, Q_current, cfg)
     %  Step 6: BSR 계산
     %  =====================================================================
     
+    % reduction_ratio가 0이면 R = Q_current
+    % reduction_ratio가 0보다 크면 R < Q_current
     R = Q_current * (1 - reduction_ratio);
     
-    % 안전성 체크
+    % 안전성 체크 (compute_bsr_policy.m에서도 수행하지만,
+    % 여기서도 한 번 더 보장)
     R = max(0, R);
     R = min(R, Q_current);
     

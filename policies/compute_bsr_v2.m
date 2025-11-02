@@ -45,15 +45,16 @@ function [R, STAs] = compute_bsr_v2(STAs, sta_idx, Q_current, cfg)
         % 큐가 증가 추세면 → 높게 보고
         
         if delta_Q <= 0
-            % 큐가 감소 중 → 적극적으로 감소
-            reduction_ratio = max_reduction;
+            % 큐가 감소 중 → "감소 비율" 계산
+            % (Q_prev - Q_current) / Q_prev
+            reduction_ratio = abs(delta_Q) / Q_prev; 
+            reduction_ratio = min(reduction_ratio, max_reduction);
+            
+            R = Q_current * (1 - reduction_ratio);
         else
-            % 큐가 증가 중 → 보수적으로 감소
-            % delta_Q가 클수록 덜 감소
-            reduction_ratio = min(max_reduction, delta_Q / Q_prev);
+            % 큐가 증가 중 → 감산 안 함
+            R = Q_current;
         end
-        
-        R = Q_current * (1 - reduction_ratio);
     end
     
     % 상태 업데이트
