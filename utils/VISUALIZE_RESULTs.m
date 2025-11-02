@@ -200,67 +200,7 @@ function figs = VISUALIZE_RESULTS(results, cfg)
         'LineWidth', 2, 'LabelHorizontalAlignment', 'left');
     
     %% =====================================================================
-    %  Figure 6: 시계열 (Stage별, 선택적)
-    %  =====================================================================
-    
-    if cfg.collect_stage_metrics && isfield(results.uora, 'collision_trace')
-        figs(end+1) = figure('Name', 'Time Series', 'Position', [350, 350, 1200, 800]);
-        
-        num_stages = length(results.uora.collision_trace);
-        stage_indices = 1:num_stages;
-        
-        % Subplot 1: UORA 상태 (Stacked Area)
-        subplot(3, 1, 1);
-        
-        collision_trace = results.uora.collision_trace;
-        success_trace = results.uora.success_trace;
-        idle_trace = cfg.numRU_SA - collision_trace - success_trace;
-        
-        area_data = [success_trace(:), collision_trace(:), idle_trace(:)];
-        area(stage_indices, area_data, 'LineStyle', 'none');
-        
-        colormap([0.2, 0.8, 0.2; 0.8, 0.2, 0.2; 0.7, 0.7, 0.7]);
-        legend({'Success', 'Collision', 'Idle'}, 'Location', 'best');
-        xlabel('Stage', 'FontSize', 11);
-        ylabel('Number of RUs', 'FontSize', 11);
-        title('UORA RU Status over Time', 'FontSize', 12);
-        grid on;
-        ylim([0, cfg.numRU_SA]);
-        
-        % Subplot 2: BSR 카운트
-        if isfield(results, 'stage_level') || (cfg.collect_stage_metrics && ...
-                isfield(metrics.stage_level, 'num_explicit'))
-            subplot(3, 1, 2);
-            
-            % 이 정보는 metrics에서 가져와야 하지만, results에 없으면 생략
-            % 임시로 더미 데이터
-            plot(stage_indices, rand(num_stages, 1) * 5, 'b-', 'DisplayName', 'Explicit');
-            hold on;
-            plot(stage_indices, rand(num_stages, 1) * 20, 'r-', 'DisplayName', 'Implicit');
-            
-            xlabel('Stage', 'FontSize', 11);
-            ylabel('BSR Count', 'FontSize', 11);
-            title('BSR Count over Time', 'FontSize', 12);
-            legend('Location', 'best');
-            grid on;
-        end
-        
-        % Subplot 3: 활성 단말 수
-        subplot(3, 1, 3);
-        
-        % 더미 데이터 (실제로는 metrics.stage_level.active_stas)
-        active_stas_trace = 10 + 5 * sin(stage_indices / 100) + randn(1, num_stages);
-        
-        plot(stage_indices, active_stas_trace, 'k-', 'LineWidth', 1.5);
-        xlabel('Stage', 'FontSize', 11);
-        ylabel('Active STAs', 'FontSize', 11);
-        title('Number of Active STAs over Time', 'FontSize', 12);
-        grid on;
-        ylim([0, cfg.num_STAs]);
-    end
-    
-    %% =====================================================================
-    %  Figure 7: 요약 대시보드
+    %  Figure 6: 요약 대시보드
     %  =====================================================================
     
     figs(end+1) = figure('Name', 'Summary Dashboard', 'Position', [400, 400, 1200, 800]);
