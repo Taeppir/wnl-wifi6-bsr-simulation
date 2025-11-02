@@ -10,6 +10,9 @@ function [RUs, AP] = SCHEDULING_RU(RUs, AP, numRU_SA, numRU_RA, size_MPDU)
 % 출력:
 %   RUs - SA-RU 할당 정보가 업데이트된 RU 구조체
 %   AP  - 업데이트된 AP 구조체
+% 버그 수정 (2025.11.02):
+%   - Round-Robin 조기 종료 문제 해결
+%   - 버퍼가 있는 모든 STA에게 공평하게 RU 할당
 
     %% =====================================================================
     %  1. 초기 조건 검사
@@ -49,29 +52,48 @@ function [RUs, AP] = SCHEDULING_RU(RUs, AP, numRU_SA, numRU_RA, size_MPDU)
     %  3. Round-Robin 할당 (우선순위 기반)
     %  =====================================================================
     
-    % ⭐ 1. RU당 전송 용량을 정의합니다 (UL_TRANSMITTING_v2와 일치해야 함)
-    bytes_per_RU = size_MPDU; %
+    % RU당 전송 용량을 정의 (UL_TRANSMITTING_v2와 일치해야 함)
+    bytes_per_RU = size_MPDU;
+
+    % 라운드-로빈 포인터: 1 = 우선순위 1번 STA
+    rr_idx = 1; 
     
     for i = 1:num_available_RUs
-        % Round-robin: 우선순위 목록을 순환하며 할당
-        sta_idx_for_this_ru = mod(i - 1, num_stas_to_schedule) + 1;
         
-        % 버퍼가 소진되었으면 조기 종료 (또는 다음 STA로)
-        if sorted_buffers(sta_idx_for_this_ru) <= 0
-            % 만약 1순위 STA의 버퍼가 다 찼으면 다음 STA로 넘어가야 하지만,
-            % 지금은 대상이 1명이므로 break와 동일하게 동작합니다.
-            % (만약 여러 STA가 있다면, 이 부분을 continue로 바꾸고
-            %  모든 STA의 버퍼가 0인지 체크하는 로직이 필요합니다.)
+        % 모든 STA의 버퍼가 소진되었는지 확인
+        if all(sorted_buffers <= 0)
+            % 할당할 수 있는 STA가 없으면 종료
+            break;
+        end
+
+        % 'rr_idx'부터 시작하여 버퍼가 남아있는 다음 STA를 찾습니다.
+        
+        attempts = 0;
+        % 'rr_idx'가 가리키는 STA의 버퍼가 0이면, 
+        % 버퍼가 0이 아닌 다음 STA를 찾을 때까지 포인터를 이동
+        while sorted_buffers(rr_idx) <= 0 && attempts < num_stas_to_schedule
+            rr_idx = mod(rr_idx, num_stas_to_schedule) + 1; % 다음 STA로 이동
+            attempts = attempts + 1;
+        end
+
+        % (안전장치) 모든 STA를 순회했는데도 버퍼가 있는 STA를 못 찾은 경우
+        if attempts >= num_stas_to_schedule
             break; 
         end
         
+        % 이제 'rr_idx'는 버퍼가 남아있는 STA를 정확히 가리킴
+
         % RU 할당
-        assigned_sta_id = sorted_STAid_list(sta_idx_for_this_ru);
+        assigned_sta_id = sorted_STAid_list(rr_idx);
         RUs(SA_RU_idx(i)).assignedSTA = assigned_sta_id;
         
-        % ⭐ 2. 스케줄러가 가상으로 버퍼를 차감합니다 (핵심 수정)
-        sorted_buffers(sta_idx_for_this_ru) = ...
-            sorted_buffers(sta_idx_for_this_ru) - bytes_per_RU;
+        % 스케줄러가 가상으로 버퍼를 차감
+        sorted_buffers(rr_idx) = ...
+            max(0, sorted_buffers(rr_idx) - bytes_per_RU);
+        
+        % ⭐ [핵심] 다음 RU를 할당하기 위해 포인터를 다음 STA로 이동
+        rr_idx = mod(rr_idx, num_stas_to_schedule) + 1;
         
     end
+    
 end
