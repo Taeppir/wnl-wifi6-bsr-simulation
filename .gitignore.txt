@@ -1,0 +1,23 @@
+# MATLAB/Simulink 임시 파일
+*.asv
+*.autosave
+*.bak
+*.mex*
+*.obj
+*.rsm
+*.pdb
+*.pdb.flat
+
+# MATLAB 캐시 및 설정
+.matlab/
+slprj/
+_Simulink_Raccel_/
+
+# MATLAB 로그 및 리포트
+*.log
+*.htm
+*.html
+
+# 데이터 파일 (필요에 따라 조절)
+# .mat 파일을 저장하고 싶다면 아래 줄을 지우거나 주석 처리(#)하세요.
+*.mat

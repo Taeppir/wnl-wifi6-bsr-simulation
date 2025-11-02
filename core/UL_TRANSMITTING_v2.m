@@ -1,0 +1,198 @@
+function [STAs, AP, RUs, tx_log] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg)
+% UL_TRANSMITTING_V2: 상향링크 전송 (RA-RU + SA-RU 통합)
+%
+% 입력:
+%   STAs             - 단말 구조체 배열
+%   AP               - AP 구조체
+%   RUs              - RU 구조체 배열
+%   tx_complete_time - 전송 완료 시각 [sec]
+%   cfg              - 설정 구조체
+%
+% 출력:
+%   STAs   - 업데이트된 단말 구조체
+%   AP     - 업데이트된 AP 구조체
+%   RUs    - 업데이트된 RU 구조체
+%   tx_log - 전송 로그 구조체
+
+    %% =====================================================================
+    %  1. 전송 로그 초기화
+    %  =====================================================================
+    
+    tx_log = struct();
+    tx_log.total_tx_bytes = 0;
+    tx_log.num_explicit_bsr = 0;
+    tx_log.num_implicit_bsr = 0;
+    tx_log.num_ra_success = 0;
+    tx_log.num_ra_collision = 0;
+    tx_log.num_ra_idle = 0;
+    % tx_log.completed_packets = [];
+    tx_log.completed_packets = struct( ...
+    'sta_idx', {}, 'packet_idx', {}, ...
+    'arrival_time', {}, 'tx_complete_time', {}, ...
+    'first_tx_time', {}, 'queuing_delay', {}, ...
+    'fragmentation_delay', {});
+    
+    bytes_per_RU = cfg.size_MPDU;
+    
+    %% =====================================================================
+    %  2. RA-RU 처리 (Explicit BSR) ⭐
+    %  =====================================================================
+    
+    % RA-RU 충돌 감지
+    RUs = DETECTING_RU_COLLISION(RUs, STAs);
+    
+    % RA-RU별 처리 (보통 1개)
+    for ru_idx = 1:cfg.numRU_RA
+        
+        accessed_STAs = RUs(ru_idx).accessedSTAs;
+        num_accessed = length(accessed_STAs);
+        
+        if num_accessed == 0
+            % 유휴
+            tx_log.num_ra_idle = tx_log.num_ra_idle + 1;
+            
+        elseif num_accessed == 1
+            % ✅ 성공: Explicit BSR 전송
+            tx_log.num_ra_success = tx_log.num_ra_success + 1;
+            
+            sta_idx = accessed_STAs(1);
+            
+            % OCW 초기화
+            STAs(sta_idx).OCW = cfg.OCW_min;
+            
+            % 현재 큐 크기
+            Q_current = sum([STAs(sta_idx).Queue.remaining_size]);
+            
+            if Q_current > 0
+                % BSR 정책 적용
+                [R_explicit, STAs] = compute_bsr_policy(STAs, sta_idx, Q_current, cfg);
+                
+                % BSR + mode 업데이트
+                [STAs, AP] = UPDATE_BSR_AND_MODE(STAs, AP, sta_idx, R_explicit);
+                
+                tx_log.num_explicit_bsr = tx_log.num_explicit_bsr + 1;
+            end
+            
+        else
+            % ❌ 충돌
+            tx_log.num_ra_collision = tx_log.num_ra_collision + 1;
+            
+            % OCW 증가 (Binary Exponential Backoff)
+            for sta_idx = accessed_STAs
+                old_ocw = STAs(sta_idx).OCW;
+                STAs(sta_idx).OCW = min(2 * (old_ocw + 1) - 1, cfg.OCW_max);
+            end
+        end
+    end
+    
+    %% =====================================================================
+    %  3. SA-RU 처리 (데이터 전송 + Implicit BSR) ⭐
+    %  =====================================================================
+    
+    for ru_idx = (cfg.numRU_RA + 1):cfg.numRU_total
+        
+        assigned_sta = RUs(ru_idx).assignedSTA;
+        
+        if assigned_sta == 0
+            continue;
+        end
+        
+        sta_idx = assigned_sta;
+        
+        % 큐가 비어있으면 스킵
+        if isempty(STAs(sta_idx).Queue)
+            continue;
+        end
+        
+        %% =================================================================
+        %  Step 3.1: 전송할 데이터 결정
+        %  =================================================================
+        
+        pkt = STAs(sta_idx).Queue(1);
+        actual_tx_bytes = min(bytes_per_RU, pkt.remaining_size);
+        
+        %% =================================================================
+        %  Step 3.2: 패킷 상태 업데이트
+        %  =================================================================
+        
+        % Remaining size 감소
+        STAs(sta_idx).Queue(1).remaining_size = ...
+            pkt.remaining_size - actual_tx_bytes;
+        
+        % 첫 전송 시각 기록
+        if isempty(STAs(sta_idx).Queue(1).first_tx_time)
+            STAs(sta_idx).Queue(1).first_tx_time = tx_complete_time;
+        end
+        
+        % 전송 통계 업데이트
+        STAs(sta_idx).num_of_transmitted = STAs(sta_idx).num_of_transmitted + 1;
+        STAs(sta_idx).transmitted_data = STAs(sta_idx).transmitted_data + actual_tx_bytes;
+        
+        tx_log.total_tx_bytes = tx_log.total_tx_bytes + actual_tx_bytes;
+        
+        %% =================================================================
+        %  Step 3.3: 패킷 완료 처리
+        %  =================================================================
+        
+        if STAs(sta_idx).Queue(1).remaining_size <= 0
+            % 패킷 전송 완료!
+            
+            completed_pkt_info = struct();
+            completed_pkt_info.sta_idx = sta_idx;
+            completed_pkt_info.packet_idx = pkt.packet_idx;
+            completed_pkt_info.arrival_time = pkt.arrival_time;
+            completed_pkt_info.tx_complete_time = tx_complete_time;
+            completed_pkt_info.first_tx_time = STAs(sta_idx).Queue(1).first_tx_time;
+            completed_pkt_info.queuing_delay = tx_complete_time - pkt.arrival_time;
+            completed_pkt_info.fragmentation_delay = ...
+                tx_complete_time - STAs(sta_idx).Queue(1).first_tx_time;
+            
+            tx_log.completed_packets(end+1) = completed_pkt_info;
+            
+            % 큐에서 제거
+            STAs(sta_idx).Queue(1) = [];
+        end
+        
+        %% =================================================================
+        %  Step 3.4: Implicit BSR 전송 ⭐
+        %  =================================================================
+        
+        % 전송 후 남은 버퍼 계산
+        remaining_buffer = sum([STAs(sta_idx).Queue.remaining_size]);
+        
+        % BSR 정책 적용
+        [R_implicit, STAs] = compute_bsr_policy(STAs, sta_idx, remaining_buffer, cfg);
+        
+        % BSR + mode 업데이트
+        [STAs, AP] = UPDATE_BSR_AND_MODE(STAs, AP, sta_idx, R_implicit);
+        
+        tx_log.num_implicit_bsr = tx_log.num_implicit_bsr + 1;
+        
+        %% =================================================================
+        %  Step 3.5: 큐가 비었으면 BSR 삭제 + mode 전환
+        %  =================================================================
+        
+        if isempty(STAs(sta_idx).Queue)
+            [STAs, AP] = DELETE_BSR_AND_MODE(STAs, AP, sta_idx);
+        end
+        
+    end  % End of SA-RU loop
+    
+    %% =====================================================================
+    %  4. AP 수신 데이터 업데이트
+    %  =====================================================================
+    
+    AP.total_rx_data = AP.total_rx_data + tx_log.total_tx_bytes;
+    
+    %% =====================================================================
+    %  5. 완료 패킷 로그 정리
+    %  =====================================================================
+    
+    if isempty(tx_log.completed_packets)
+        tx_log.completed_packets = struct( ...
+            'sta_idx', {}, 'packet_idx', {}, ...
+            'arrival_time', {}, 'tx_complete_time', {}, ...
+            'first_tx_time', {}, 'queuing_delay', {}, ...
+            'fragmentation_delay', {});
+    end
+end
