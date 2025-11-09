@@ -53,9 +53,13 @@ function [R, STAs, metrics] = compute_bsr_policy(STAs, sta_idx, Q_current, curre
             metrics.policy_level.trace.sta_id(idx) = sta_idx;
             metrics.policy_level.trace.Q(idx) = Q_current;
             metrics.policy_level.trace.R(idx) = R;
+            
             if cfg.scheme_id == 3
                 metrics.policy_level.trace.Q_ema(idx) = STAs(sta_idx).Q_ema;
+            else
+                metrics.policy_level.trace.Q_ema(idx) = nan;
             end
+
             metrics.policy_level.trace_idx = idx;
         end
     end
