@@ -126,8 +126,6 @@ function [results, metrics] = main_sim_v2(cfg)
         % -----------------------------------------------------------------
         
         if ~is_warmup
-            % ⚠️ [수정] 누락된 메트릭 수집 코드 추가
-            
             % --- 6.1: Cumulative 메트릭 누적 ---
             
             % UORA (RA)
@@ -135,6 +133,7 @@ function [results, metrics] = main_sim_v2(cfg)
                 (tx_log.num_ra_success + tx_log.num_ra_collision);
             metrics.cumulative.total_uora_collisions = metrics.cumulative.total_uora_collisions + tx_log.num_ra_collision;
             metrics.cumulative.total_uora_success = metrics.cumulative.total_uora_success + tx_log.num_ra_success;
+            metrics.cumulative.total_uora_idle = metrics.cumulative.total_uora_idle + tx_log.num_ra_idle;
             
             if isfield(tx_log, 'num_ra_idle')
                 metrics.cumulative.total_uora_idle = metrics.cumulative.total_uora_idle + tx_log.num_ra_idle;

@@ -105,7 +105,11 @@ function cfg = config_default()
     cfg.scheme_id = 0;
     
     cfg.v1_fixed_reduction_bytes = 500;
+    cfg.v1_sensitivity = 1.0;
+
     cfg.v2_max_reduction = 0.7;
+    cfg.v2_sensitivity = 1.0;
+
     cfg.v3_EMA_alpha = 0.2;
     cfg.v3_sensitivity = 1.0;
     cfg.v3_max_reduction = 0.7;

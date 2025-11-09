@@ -19,6 +19,7 @@ function [R, STAs] = compute_bsr_v2(STAs, sta_idx, Q_current, cfg)
     Q_prev = STAs(sta_idx).Q_prev;
     
     % 파라미터
+    sensitivity = cfg.v2_sensitivity;
     max_reduction = cfg.v2_max_reduction;  % 예: 0.7
     burst_threshold = cfg.burst_threshold;
     reduction_threshold = cfg.reduction_threshold;
@@ -47,7 +48,8 @@ function [R, STAs] = compute_bsr_v2(STAs, sta_idx, Q_current, cfg)
         if delta_Q <= 0
             % 큐가 감소 중 → "감소 비율" 계산
             % (Q_prev - Q_current) / Q_prev
-            reduction_ratio = abs(delta_Q) / Q_prev; 
+            base_ratio = abs(delta_Q) / Q_prev; 
+            reduction_ratio = sensitivity * base_ratio;
             reduction_ratio = min(reduction_ratio, max_reduction);
             
             R = Q_current * (1 - reduction_ratio);
