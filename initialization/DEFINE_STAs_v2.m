@@ -11,6 +11,15 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
 
     STAs = struct();
     
+    queue_max_size = cfg.max_packets_per_sta;
+
+    empty_packet_entry = struct(...
+        'packet_idx', NaN, ...
+        'total_size', NaN, ...
+        'arrival_time', NaN, ...
+        'remaining_size', NaN, ...
+        'first_tx_time', []);
+
     for i = 1:numSTAs
         % 기본 정보
         STAs(i).ID = i;
@@ -22,9 +31,17 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
         STAs(i).did_tx_attempt = false;
         STAs(i).accessed_RA_RU = 0;
         
-        % 큐 관리
-        STAs(i).Queue = [];              % 활성 큐 (전송 대기)
+        % 큐 관리 (대기 큐)
         STAs(i).packet_list = [];        % 대기 큐 (도착 대기)
+        STAs(i).packet_list_next_idx = 1; % [개선] packet_list에서 다음에 읽을 인덱스
+
+        % [개선] 활성 큐 (원형 큐로 구현)
+        STAs(i).Queue = repmat(empty_packet_entry, queue_max_size, 1);
+        STAs(i).queue_max_size = queue_max_size; % 큐의 최대 용량
+        STAs(i).queue_head = 1;      % 읽을 위치 (첫 번째 패킷)
+        STAs(i).queue_tail = 1;      % 쓸 위치 (다음 빈 슬롯)
+        STAs(i).queue_size = 0;      % 현재 큐에 있는 패킷 수
+        STAs(i).queue_total_bytes = 0; % [개선] 큐에 있는 모든 패킷의 remaining_size 합계
         
         % BSR 관련
         STAs(i).Q_prev = 0;              % 이전 큐 크기

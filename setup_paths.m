@@ -18,6 +18,9 @@ folders = {
     'metrics'
     'utils'
     'tests'
+    'tests/1_core'
+    'tests/2_mechanisms'
+    'tests/3_integration'
 };
 
 % 경로 추가

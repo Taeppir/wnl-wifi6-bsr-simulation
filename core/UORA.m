@@ -20,7 +20,7 @@ function STAs = UORA(STAs, numRU)
     for i = 1:length(STAs)
 
         % UORA 참여 조건 확인: 전송할 데이터가 있고, RA mode
-        has_data = ~isempty(STAs(i).Queue);
+        has_data = (STAs(i).queue_size > 0);
         is_ra_mode = (STAs(i).mode == 0);
         
         should_participate = has_data && is_ra_mode;

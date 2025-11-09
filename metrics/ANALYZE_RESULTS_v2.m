@@ -189,15 +189,28 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     end
     
     % BSR 대기 지연 집계
-    all_bsr_delays = [];
+    total_bsr_samples = sum([STAs.bsr_idx]);
+    all_bsr_delays = nan(total_bsr_samples, 1);
+    current_idx = 0;
+
     for i = 1:length(STAs)
-        if STAs(i).bsr_idx > 0  % ⭐ 안전 체크
-            valid_idx = 1:STAs(i).bsr_idx;
+        num_samples_sta = STAs(i).bsr_idx;
+        if num_samples_sta > 0  % ⭐ 안전 체크
+            valid_idx = 1:num_samples_sta;
             bsr_delays = STAs(i).bsr_delays(valid_idx);
             bsr_delays = bsr_delays(~isnan(bsr_delays) & bsr_delays >= 0);
-            all_bsr_delays = [all_bsr_delays; bsr_delays]; %#ok<AGROW>
+            
+            % [개선] 2. 미리 할당된 공간에 데이터 복사
+            num_valid_samples = length(bsr_delays);
+            if num_valid_samples > 0
+                all_bsr_delays(current_idx + 1 : current_idx + num_valid_samples) = bsr_delays;
+                current_idx = current_idx + num_valid_samples;
+            end
         end
     end
+    
+    % [개선] 3. 실제 채워진 부분만 잘라내기
+    all_bsr_delays = all_bsr_delays(1:current_idx);
 
     if ~isempty(all_bsr_delays) && length(all_bsr_delays) > 0
         results.bsr.mean_waiting_delay = mean(all_bsr_delays);

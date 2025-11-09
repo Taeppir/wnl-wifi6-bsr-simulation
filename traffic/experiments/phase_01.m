@@ -43,7 +43,7 @@ fixed_alpha = 1.5;
 fixed_mu_on = 0.05;  % 50ms On-period
 
 % 실험 반복 횟수
-num_runs = 2;
+num_runs = 1;
 
 % 결과 저장 디렉토리
 results_dir = 'results/phase1';

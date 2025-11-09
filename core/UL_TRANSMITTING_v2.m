@@ -63,8 +63,8 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             % OCW 초기화
             STAs(sta_idx).OCW = cfg.OCW_min;
             
-            % 현재 큐 크기
-            Q_current = sum([STAs(sta_idx).Queue.remaining_size]);
+            % 현재 큐 크기 조회
+            Q_current = STAs(sta_idx).queue_total_bytes;
             
             if Q_current > 0
                 % BSR 정책 적용
@@ -103,24 +103,30 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         sta_idx = assigned_sta;
         
         % 큐가 비어있으면 스킵
-        if isempty(STAs(sta_idx).Queue)
+        % [개선] 큐가 비어있는지 확인 (size 변수 사용)
+        if STAs(sta_idx).queue_size == 0
             continue;
         end
         
+        head_idx = STAs(sta_idx).queue_head;
         %% =================================================================
         %  Step 3.1: 전송할 데이터 결정
         %  =================================================================
         
-        pkt = STAs(sta_idx).Queue(1);
-        actual_tx_bytes = min(bytes_per_RU, pkt.remaining_size);
+        %  Queue(head_idx)에서 패킷 읽기
+        pkt_remaining = STAs(sta_idx).Queue(head_idx).remaining_size;
+        actual_tx_bytes = min(bytes_per_RU, pkt_remaining);
         
         %% =================================================================
         %  Step 3.2: 패킷 상태 업데이트
         %  =================================================================
         
-        % Remaining size 감소
-        STAs(sta_idx).Queue(1).remaining_size = ...
-            pkt.remaining_size - actual_tx_bytes;
+        % Queue(head_idx)의 remaining_size 업데이트
+        new_remaining_size = pkt_remaining - actual_tx_bytes;
+        STAs(sta_idx).Queue(head_idx).remaining_size = new_remaining_size;
+        
+        % queue_total_bytes 업데이트 (sum() 대신)
+        STAs(sta_idx).queue_total_bytes = STAs(sta_idx).queue_total_bytes - actual_tx_bytes;
         
         % 첫 전송 시각 기록
         if isempty(STAs(sta_idx).Queue(1).first_tx_time)
@@ -137,8 +143,11 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         %  Step 3.3: 패킷 완료 처리
         %  =================================================================
         
-        if STAs(sta_idx).Queue(1).remaining_size <= 0
+        if new_remaining_size <= 0
             % 패킷 전송 완료!
+
+            % 완료된 패킷 정보 읽기 (head_idx 사용)
+            pkt = STAs(sta_idx).Queue(head_idx);
             
             completed_pkt_info = struct();
             completed_pkt_info.sta_idx = sta_idx;
@@ -150,6 +159,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             completed_pkt_info.fragmentation_delay = ...
                 tx_complete_time - STAs(sta_idx).Queue(1).first_tx_time;
             
+            % 사전 할당된 로그에 저장
             log_idx = log_idx + 1;
             if log_idx <= max_completions
                 tx_log.completed_packets(log_idx) = completed_pkt_info;
@@ -158,8 +168,10 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
                 warning('UL_TRANSMITTING_v2: completed_packets 사전 할당 크기 초과');
             end
             
-            % 큐에서 제거
-            STAs(sta_idx).Queue(1) = [];
+            % [개선] 큐에서 제거 (head 포인터 이동 및 size 감소)
+            % (데이터를 실제로 지우지 않음)
+            STAs(sta_idx).queue_head = mod(head_idx, STAs(sta_idx).queue_max_size) + 1;
+            STAs(sta_idx).queue_size = STAs(sta_idx).queue_size - 1;
         end
         
         %% =================================================================
@@ -167,7 +179,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         %  =================================================================
         
         % 전송 후 남은 버퍼 계산
-        remaining_buffer = sum([STAs(sta_idx).Queue.remaining_size]);
+        remaining_buffer = STAs(sta_idx).queue_total_bytes;
         
         % BSR 정책 적용
         [R_implicit, STAs, metrics] = compute_bsr_policy(STAs, sta_idx, remaining_buffer,tx_complete_time, cfg, metrics);
@@ -181,7 +193,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         %  Step 3.5: 큐가 비었으면 BSR 삭제 + mode 전환
         %  =================================================================
         
-        if isempty(STAs(sta_idx).Queue)
+        if STAs(sta_idx).queue_size == 0
             [STAs, AP] = DELETE_BSR_AND_MODE(STAs, AP, sta_idx);
         end
         

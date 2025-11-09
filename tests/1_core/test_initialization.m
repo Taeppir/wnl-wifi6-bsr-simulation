@@ -1,11 +1,8 @@
 %% test_initialization.m
 % 초기화 함수 검증
 %
-% 검증 내용:
-%   - DEFINE_AP
-%   - DEFINE_STAs_v2
-%   - DEFINE_RUs
-%   - init_metrics_struct
+% [수정]
+%   - Test 2: STA 초기화 시 원형 큐 관련 필드(queue_size 등) 검증
 
 clear; close all; clc;
 
@@ -28,29 +25,36 @@ AP = DEFINE_AP(cfg.num_STAs);
 required_fields = {'BSR', 'total_rx_data', 'num_connected_STAs'};
 all_present = all(cellfun(@(f) isfield(AP, f), required_fields));
 
+% [수정] BSR이 사전 할당되었는지, 내용은 NaN인지 확인
+bsr_preallocated = (length(AP.BSR) == cfg.num_STAs) && ...
+                   all(isnan([AP.BSR.Buffer_Status]));
+
 total_tests = total_tests + 1;
 
-if all_present && isempty(AP.BSR) && AP.total_rx_data == 0
-    fprintf('  ✅ PASS: AP 초기화 정상\n');
+if all_present && bsr_preallocated && AP.total_rx_data == 0
+    fprintf('  ✅ PASS: AP 초기화 및 BSR 사전 할당 정상\n');
     fprintf('    연결 단말: %d개\n', AP.num_connected_STAs);
     passed_tests = passed_tests + 1;
 else
-    fprintf('  ❌ FAIL: AP 초기화 오류\n');
+    fprintf('  ❌ FAIL: AP 초기화 또는 BSR 사전 할당 오류\n');
 end
 
 fprintf('\n');
 
 %% Test 2: STAs 초기화
-fprintf('[Test 2] DEFINE_STAs_v2\n');
+fprintf('[Test 2] DEFINE_STAs_v2 (원형 큐 검증)\n');
 fprintf('----------------------------------------\n');
 
 STAs = DEFINE_STAs_v2(cfg.num_STAs, cfg.OCW_min, cfg);
 
+% [수정] 원형 큐 필드 추가
 required_sta_fields = {
-    'ID', 'mode', 'OCW', 'OBO', 'Queue', 'packet_list', ...
+    'ID', 'mode', 'OCW', 'OBO', 'packet_list', ...
     'Q_prev', 'Q_ema', 'ema_initialized', ...
     'is_waiting_for_first_SA', 'assigned_SA_RU', ...
-    'packet_queuing_delays', 'delay_idx'
+    'packet_queuing_delays', 'delay_idx', ...
+    'Queue', 'queue_max_size', 'queue_head', 'queue_tail', ...
+    'queue_size', 'queue_total_bytes' 
 };
 
 sta1 = STAs(1);
@@ -60,19 +64,23 @@ all_present = all(cellfun(@(f) isfield(sta1, f), required_sta_fields));
 all_ids = [STAs.ID];
 ids_unique = length(unique(all_ids)) == cfg.num_STAs;
 
-% 초기값 확인
+% [수정] 초기값 확인 (원형 큐 기준)
 initial_values_ok = (sta1.mode == 0) && ...
                     (sta1.OCW == cfg.OCW_min) && ...
-                    isempty(sta1.Queue) && ...
-                    isempty(sta1.packet_list);
+                    isempty(sta1.packet_list) && ...
+                    (length(sta1.Queue) == cfg.max_packets_per_sta) && ...
+                    (sta1.queue_size == 0) && ...
+                    (sta1.queue_total_bytes == 0) && ...
+                    (sta1.queue_head == 1) && ...
+                    (sta1.queue_tail == 1);
 
 total_tests = total_tests + 1;
 
 if all_present && ids_unique && initial_values_ok
-    fprintf('  ✅ PASS: STAs 초기화 정상\n');
+    fprintf('  ✅ PASS: STAs 초기화 정상 (원형 큐 포함)\n');
     fprintf('    단말 수: %d\n', length(STAs));
-    fprintf('    초기 mode: 0 (RA)\n');
-    fprintf('    초기 OCW: %d\n', cfg.OCW_min);
+    fprintf('    초기 큐 크기: %d (사전 할당됨)\n', length(sta1.Queue));
+    fprintf('    초기 큐 상태: size=0, head=1, tail=1\n');
     passed_tests = passed_tests + 1;
 else
     fprintf('  ❌ FAIL: STAs 초기화 오류\n');
@@ -149,13 +157,14 @@ fprintf('[Test 5] 초기화 통합 일관성\n');
 fprintf('----------------------------------------\n');
 
 consistency_ok = (AP.num_connected_STAs == length(STAs)) && ...
-                 (length(RUs) == cfg.numRU_total);
+                 (length(RUs) == cfg.numRU_total) && ...
+                 (AP.num_connected_STAs == length(AP.BSR)); % BSR 테이블 크기 확인
 
 total_tests = total_tests + 1;
 
 if consistency_ok
     fprintf('  ✅ PASS: 초기화 간 일관성 유지\n');
-    fprintf('    AP ↔ STAs: %d = %d\n', AP.num_connected_STAs, length(STAs));
+    fprintf('    AP ↔ STAs ↔ BSR: %d = %d = %d\n', AP.num_connected_STAs, length(STAs), length(AP.BSR));
     fprintf('    RUs: %d\n', length(RUs));
     passed_tests = passed_tests + 1;
 else
