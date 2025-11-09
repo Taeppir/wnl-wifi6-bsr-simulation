@@ -1,19 +1,9 @@
 %% test_circular_queue.m
 % 원형 큐(Circular Queue) 구현 검증
 %
-% 검증 대상:
-%   - initialization/DEFINE_STAs_v2.m: 큐 사전 할당 및 포인터 초기화
-%   - core/UPDATE_QUE.m: Enqueue (tail 포인터)
-%   - core/UL_TRANSMITTING_v2.m: Dequeue (head 포인터) 및 큐 상태 변수
-%   - core/UORA.m: 큐 상태 확인 (queue_size)
-%
-% 핵심 시나리오:
-%   1. 초기화 (Initialization)
-%   2. Enqueue (패킷 추가)
-%   3. Dequeue (패킷 제거)
-%   4. 부분 전송 (queue_total_bytes 검증)
-%   5. 엣지 케이스: Wrap-around (배열 끝 → 처음으로 순환)
-%   6. 엣지 케이스: Overflow (큐 가득 참)
+% [수정]
+%   - UL_TRANSMITTING_v2 호출 시 (tx_start_time, tx_complete_time)
+%     두 개의 시간 인수를 전달하도록 수정
 
 clear; close all; clc;
 
@@ -66,7 +56,10 @@ STAs = DEFINE_STAs_v2(1, cfg.OCW_min, cfg);
 STAs(1).packet_list = struct(...
     'packet_idx', 1, ...
     'total_size', 2000, ...
-    'arrival_time', 0.1);
+    'arrival_time', 0.1, ...
+    'remaining_size', 2000, ...
+    'first_tx_time', [], ...
+    'is_bsr_wait_packet', false);
 STAs(1).num_of_packets = 1;
 STAs(1).packet_list_next_idx = 1;
 
@@ -108,8 +101,10 @@ RUs(2).assignedSTA = 1; % STA 1에게 SA-RU (ID=2) 할당
 cfg.size_MPDU = 2000; % 패킷이 한 번에 전송되도록 설정
 
 % 3. Dequeue 실행
-tx_time = 0.3;
-[STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_time, cfg, metrics);
+% [수정] tx_start_time과 tx_complete_time 전달
+tx_start_time = 0.3;
+tx_complete_time = 0.35; % (시간이 걸렸다고 가정)
+[STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_start_time, tx_complete_time, cfg, metrics);
 sta1 = STAs(1);
 
 total_tests = total_tests + 1;
@@ -137,7 +132,7 @@ fprintf('----------------------------------------\n');
 
 % 1. STA 초기화 및 Enqueue
 STAs = DEFINE_STAs_v2(1, cfg.OCW_min, cfg);
-STAs(1).packet_list = struct('packet_idx', 1, 'total_size', 2000, 'arrival_time', 0.1);
+STAs(1).packet_list = struct('packet_idx', 1, 'total_size', 2000, 'arrival_time', 0.1, 'remaining_size', 2000, 'first_tx_time', [], 'is_bsr_wait_packet', false);
 STAs(1).num_of_packets = 1;
 STAs(1).packet_list_next_idx = 1;
 STAs = UPDATE_QUE(STAs, 0.2); % size=1, bytes=2000, head=1, tail=2
@@ -153,7 +148,10 @@ cfg_partial = cfg;
 cfg_partial.size_MPDU = 1500; % 2000 중 1500만 전송
 
 % 4. 전송 실행 (Dequeue 일어나면 안 됨)
-[STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, 0.3, cfg_partial, metrics);
+% [수정] tx_start_time과 tx_complete_time 전달
+tx_start_time = 0.3;
+tx_complete_time = 0.35;
+[STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_start_time, tx_complete_time, cfg_partial, metrics);
 sta1 = STAs(1);
 
 total_tests = total_tests + 1;
@@ -213,8 +211,8 @@ cfg_bsr = cfg;
 cfg_bsr.size_MPDU = 1000;
 STAs = DEFINE_STAs_v2(1, cfg_bsr.OCW_min, cfg_bsr);
 STAs(1).packet_list = [
-    struct('packet_idx', 1, 'total_size', 2000, 'arrival_time', 0.1);
-    struct('packet_idx', 2, 'total_size', 1000, 'arrival_time', 0.1)
+    struct('packet_idx', 1, 'total_size', 2000, 'arrival_time', 0.1, 'remaining_size', 2000, 'first_tx_time', [], 'is_bsr_wait_packet', false);
+    struct('packet_idx', 2, 'total_size', 1000, 'arrival_time', 0.1, 'remaining_size', 1000, 'first_tx_time', [], 'is_bsr_wait_packet', false)
 ];
 STAs(1).num_of_packets = 2;
 STAs(1).packet_list_next_idx = 1;
@@ -226,7 +224,10 @@ RUs(2).assignedSTA = 1; % SA-RU 할당
 
 % 2. 전송 (1000 바이트 전송) -> Implicit BSR 트리거
 %    전송 후 남은 버퍼 = 3000 - 1000 = 2000 바이트
-[STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, 0.3, cfg_bsr, metrics);
+% [수정] tx_start_time과 tx_complete_time 전달
+tx_start_time = 0.3;
+tx_complete_time = 0.35;
+[STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_start_time, tx_complete_time, cfg_bsr, metrics);
 
 total_tests = total_tests + 1;
 reported_bsr = AP.BSR(1).Buffer_Status;
@@ -255,11 +256,11 @@ RUs = DEFINE_RUs(cfg_small.numRU_total, cfg_small.numRU_RA);
 metrics = init_metrics_struct(cfg_small);
 
 STAs(1).packet_list = [
-    struct('packet_idx', 1, 'total_size', 1000, 'arrival_time', 0.1); % P1
-    struct('packet_idx', 2, 'total_size', 1000, 'arrival_time', 0.1); % P2
-    struct('packet_idx', 3, 'total_size', 1000, 'arrival_time', 0.1); % P3
-    struct('packet_idx', 4, 'total_size', 1000, 'arrival_time', 0.3); % P4
-    struct('packet_idx', 5, 'total_size', 1000, 'arrival_time', 0.3); % P5
+    struct('packet_idx', 1, 'total_size', 1000, 'arrival_time', 0.1, 'remaining_size', 1000, 'first_tx_time', [], 'is_bsr_wait_packet', false); % P1
+    struct('packet_idx', 2, 'total_size', 1000, 'arrival_time', 0.1, 'remaining_size', 1000, 'first_tx_time', [], 'is_bsr_wait_packet', false); % P2
+    struct('packet_idx', 3, 'total_size', 1000, 'arrival_time', 0.1, 'remaining_size', 1000, 'first_tx_time', [], 'is_bsr_wait_packet', false); % P3
+    struct('packet_idx', 4, 'total_size', 1000, 'arrival_time', 0.3, 'remaining_size', 1000, 'first_tx_time', [], 'is_bsr_wait_packet', false); % P4
+    struct('packet_idx', 5, 'total_size', 1000, 'arrival_time', 0.3, 'remaining_size', 1000, 'first_tx_time', [], 'is_bsr_wait_packet', false); % P5
 ];
 STAs(1).num_of_packets = 5;
 STAs(1).packet_list_next_idx = 1;
@@ -271,9 +272,11 @@ STAs = UPDATE_QUE(STAs, 0.2);
 
 % 3. Dequeue (P1, P2) -> 큐에 P3만 남음
 RUs(2).assignedSTA = 1; % P1 전송
-[STAs, AP, RUs, ~, ~] = UL_TRANSMITTING_v2(STAs, AP, RUs, 0.25, cfg_small, metrics);
+% [수정] tx_start_time과 tx_complete_time 전달
+[STAs, AP, RUs, ~, ~] = UL_TRANSMITTING_v2(STAs, AP, RUs, 0.25, 0.27, cfg_small, metrics);
 RUs(2).assignedSTA = 1; % P2 전송
-[STAs, AP, RUs, ~, ~] = UL_TRANSMITTING_v2(STAs, AP, RUs, 0.28, cfg_small, metrics);
+% [수정] tx_start_time과 tx_complete_time 전달
+[STAs, AP, RUs, ~, ~] = UL_TRANSMITTING_v2(STAs, AP, RUs, 0.28, 0.30, cfg_small, metrics);
 % 상태: size=1, head=3, tail=1
 % 큐: [_, _, P3]
 
