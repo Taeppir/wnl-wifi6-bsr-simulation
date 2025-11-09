@@ -1,13 +1,11 @@
 %% test_scheduling_ru_bugfix.m
 % SCHEDULING_RU 버그 수정 검증 테스트
 %
-% 사용법:
-%   >> test_scheduling_ru
-%
-% 테스트 시나리오:
-%   1. 단일 STA, 많은 버퍼 → 모든 RU 할당
-%   2. 여러 STA, 일부 버퍼 소진 → 나머지 STA에 계속 할당
-%   3. 버퍼 크기 순서대로 Round-Robin 확인
+% [수정]
+%   - DEFINE_AP로 사전 할당된 AP.BSR 테이블을 덮어쓰지 않고,
+%     AP.BSR(sta_idx).Buffer_Status = ... 로 수정하여 테스트
+%   - Test 2: AP = DEFINE_AP(3) -> DEFINE_AP(4)로 수정 (4개 STA 사용)
+%   - Test 5: AP.BSR = [] 대신, 초기화된 NaN 상태를 테스트
 
 clear; close all; clc;
 
@@ -29,8 +27,8 @@ fprintf('----------------------------------------\n');
 AP = DEFINE_AP(1);
 RUs = DEFINE_RUs(9, 1);  % RA:1, SA:4
 
-% BSR 테이블: STA 1이 많은 버퍼 보유
-AP.BSR = struct('STA_ID', 1, 'Buffer_Status', 10000);
+% [수정] BSR 테이블: STA 1이 많은 버퍼 보유 (직접 인덱싱)
+AP.BSR(1).Buffer_Status = 10000;
 
 % 스케줄링
 [RUs_new, ~] = SCHEDULING_RU(RUs, AP, 4, 1, cfg.size_MPDU);
@@ -54,21 +52,17 @@ fprintf('\n');
 fprintf('[Test 2] 여러 STA, 일부 버퍼 소진 ⭐\n');
 fprintf('----------------------------------------\n');
 fprintf('  시나리오: STA 2의 버퍼가 1 RU만 필요\n');
-fprintf('  기대 결과: STA 2 소진 후 STA 1, 3에 계속 할당\n\n');
+fprintf('  기대 결과: STA 2 소진 후 STA 1, 3, 4에 계속 할당\n\n');
 
-AP = DEFINE_AP(3);
+% [수정] 4개의 STA를 사용하므로 DEFINE_AP(4) 호출
+AP = DEFINE_AP(4);
 RUs = DEFINE_RUs(9, 1);  % RA:1, SA:8
 
-% BSR 테이블:
-%   STA 1: 10000 bytes (많음)
-%   STA 2: 1000 bytes (1 RU만 필요)
-%   STA 3: 5000 bytes (중간)
-AP.BSR = [
-    struct('STA_ID', 1, 'Buffer_Status', 10000);
-    struct('STA_ID', 2, 'Buffer_Status', 1000);
-    struct('STA_ID', 3, 'Buffer_Status', 5000);
-    struct('STA_ID', 4, 'Buffer_Status', 3500);
-];
+% [수정] BSR 테이블 (직접 인덱싱)
+AP.BSR(1).Buffer_Status = 10000; % 많음
+AP.BSR(2).Buffer_Status = 1000;  % 1 RU만 필요
+AP.BSR(3).Buffer_Status = 5000;  % 중간
+AP.BSR(4).Buffer_Status = 3500;  % 중간
 
 % 스케줄링
 [RUs_new, ~] = SCHEDULING_RU(RUs, AP, 8, 1, cfg.size_MPDU);
@@ -131,12 +125,10 @@ fprintf('  기대 결과: 3 → 1 → 2 → 3 → 1 → 2 ...\n\n');
 AP = DEFINE_AP(3);
 RUs = DEFINE_RUs(7, 1);  % RA:1, SA:6
 
-% BSR 테이블 (버퍼 크기 다르게)
-AP.BSR = [
-    struct('STA_ID', 1, 'Buffer_Status', 5000);   % 중간
-    struct('STA_ID', 2, 'Buffer_Status', 3000);   % 작음
-    struct('STA_ID', 3, 'Buffer_Status', 8000);   % 큼
-];
+% [수정] BSR 테이블 (직접 인덱싱)
+AP.BSR(1).Buffer_Status = 5000;   % 중간
+AP.BSR(2).Buffer_Status = 3000;   % 작음
+AP.BSR(3).Buffer_Status = 8000;   % 큼
 
 % 스케줄링
 [RUs_new, ~] = SCHEDULING_RU(RUs, AP, 6, 1, cfg.size_MPDU);
@@ -180,11 +172,9 @@ fprintf('----------------------------------------\n');
 AP = DEFINE_AP(2);
 RUs = DEFINE_RUs(5, 1);  % RA:1, SA:4
 
-% BSR 테이블: 매우 작은 버퍼 (1 RU만 필요)
-AP.BSR = [
-    struct('STA_ID', 1, 'Buffer_Status', 1500);
-    struct('STA_ID', 2, 'Buffer_Status', 1500);
-];
+% [수정] BSR 테이블 (직접 인덱싱)
+AP.BSR(1).Buffer_Status = 1500;
+AP.BSR(2).Buffer_Status = 1500;
 
 % 스케줄링
 [RUs_new, ~] = SCHEDULING_RU(RUs, AP, 4, 1, cfg.size_MPDU);
@@ -201,7 +191,6 @@ if assigned_rus == 2
     passed_tests = passed_tests + 1;
 else
     fprintf('  ⚠️  예상: 2개, 실제: %d개\n', assigned_rus);
-    % 이것도 큰 문제는 아님 (버퍼 크기에 따라 달라질 수 있음)
     if assigned_rus >= 2
         passed_tests = passed_tests + 1;
     end
@@ -210,12 +199,13 @@ end
 fprintf('\n');
 
 %% Test 5: 빈 BSR 테이블
-fprintf('[Test 5] 빈 BSR 테이블\n');
+fprintf('[Test 5] BSR 보고 없는 테이블 (NaN)\n');
 fprintf('----------------------------------------\n');
 
+% [수정] DEFINE_AP(3)만 호출하면 BSR이 모두 NaN인 상태가 됨
 AP = DEFINE_AP(3);
 RUs = DEFINE_RUs(5, 1);
-AP.BSR = [];  % 빈 테이블
+% AP.BSR = []; % 이 코드가 필요 없어짐
 
 % 스케줄링
 [RUs_new, ~] = SCHEDULING_RU(RUs, AP, 4, 1, cfg.size_MPDU);
@@ -224,7 +214,7 @@ assigned_rus = sum([RUs_new.assignedSTA] > 0);
 
 total_tests = total_tests + 1;
 if assigned_rus == 0
-    fprintf('  ✅ PASS: 빈 테이블 처리 정상\n');
+    fprintf('  ✅ PASS: BSR이 NaN인 테이블 처리 정상 (할당 없음)\n');
     passed_tests = passed_tests + 1;
 else
     fprintf('  ❌ FAIL: 할당이 발생함 (%d개)\n', assigned_rus);

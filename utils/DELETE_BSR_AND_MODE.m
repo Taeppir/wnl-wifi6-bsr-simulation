@@ -14,10 +14,10 @@ function [STAs, AP] = DELETE_BSR_AND_MODE(STAs, AP, sta_idx)
     %  1. BSR 테이블에서 삭제
     %  =====================================================================
     
-    idx = find([AP.BSR.STA_ID] == sta_idx, 1);
-    
-    if ~isempty(idx)
-        AP.BSR(idx) = [];
+    if sta_idx > 0 && sta_idx <= length(AP.BSR)
+        AP.BSR(sta_idx).Buffer_Status = NaN;
+    else
+         warning('DELETE_BSR_AND_MODE: 유효하지 않은 sta_idx(%d)입니다.', sta_idx);
     end
     
     %% =====================================================================

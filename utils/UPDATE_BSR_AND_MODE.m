@@ -14,18 +14,13 @@ function [STAs, AP] = UPDATE_BSR_AND_MODE(STAs, AP, sta_idx, buffer_status)
     %% =====================================================================
     %  1. BSR 테이블 업데이트
     %  =====================================================================
-    
-    idx = find([AP.BSR.STA_ID] == sta_idx, 1);
-    
-    if isempty(idx)
-        % 새로 추가
-        new_entry = struct('STA_ID', sta_idx, 'Buffer_Status', buffer_status);
-        AP.BSR(end+1) = new_entry;
+    if sta_idx > 0 && sta_idx <= length(AP.BSR)
+        % STA_ID는 이미 1:N으로 채워져 있으므로 Buffer_Status만 갱신
+        AP.BSR(sta_idx).Buffer_Status = buffer_status;
     else
-        % 기존 값 업데이트
-        AP.BSR(idx).Buffer_Status = buffer_status;
+        warning('UPDATE_BSR_AND_MODE: 유효하지 않은 sta_idx(%d)입니다.', sta_idx);
     end
-    
+
     %% =====================================================================
     %  2. Mode 자동 동기화
     %  =====================================================================

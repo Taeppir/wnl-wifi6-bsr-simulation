@@ -1,11 +1,9 @@
 %% test_uora_mechanism.m
 % UORA 메커니즘 검증
 %
-% 검증 내용:
-%   1. OBO 카운터 감소 동작
-%   2. RU 접근 조건 (OBO <= 0)
-%   3. 충돌 감지
-%   4. OCW 증가 (BEB)
+% [수정]
+%   - Test 1, 4: STA 큐에 데이터를 추가하는 방식을
+%     `STA.Queue = ...` 대신 `STA.queue_size = 1`로 변경
 
 clear; close all; clc;
 
@@ -30,11 +28,11 @@ STAs(1).OBO = 5;
 STAs(2).OBO = 1;
 STAs(3).OBO = 0;
 
-% 모두 RA 모드, 데이터 있음
+% [수정] 모두 RA 모드, 데이터 있음 (원형 큐 상태 변수 설정)
 for i = 1:3
     STAs(i).mode = 0;
-    STAs(i).Queue = struct('packet_idx', 1, 'total_size', 2000, ...
-        'arrival_time', 0, 'remaining_size', 2000, 'first_tx_time', []);
+    STAs(i).queue_size = 1;         % 큐에 데이터가 1개 있다고 설정
+    STAs(i).queue_total_bytes = 2000; % UORA는 이 값을 보진 않지만, 일관성을 위해 설정
 end
 
 % UORA 실행 (numRU = 1)
@@ -111,28 +109,29 @@ end
 
 fprintf('\n');
 
-%% Test 4: RA 모드 단말만 참여
-fprintf('[Test 4] RA 모드 필터링\n');
+%% Test 4: RA 모드 필터링
+fprintf('[Test 4] RA 모드 필터링 (원형 큐 검증)\n');
 fprintf('----------------------------------------\n');
 
 STAs_mode = DEFINE_STAs_v2(3, cfg.OCW_min, cfg);
 
-% STA 1: RA, 데이터 있음
+% [수정] STA 1: RA, 데이터 있음 (queue_size = 1)
 STAs_mode(1).mode = 0;
 STAs_mode(1).OBO = 0;
-STAs_mode(1).Queue = struct('packet_idx', 1, 'total_size', 2000, ...
-    'arrival_time', 0, 'remaining_size', 2000, 'first_tx_time', []);
+STAs_mode(1).queue_size = 1;
+STAs_mode(1).queue_total_bytes = 2000;
 
-% STA 2: SA, 데이터 있음
+% [수정] STA 2: SA, 데이터 있음 (queue_size = 1, mode = 1)
 STAs_mode(2).mode = 1;
 STAs_mode(2).OBO = 0;
-STAs_mode(2).Queue = struct('packet_idx', 1, 'total_size', 2000, ...
-    'arrival_time', 0, 'remaining_size', 2000, 'first_tx_time', []);
+STAs_mode(2).queue_size = 1;
+STAs_mode(2).queue_total_bytes = 2000;
 
-% STA 3: RA, 데이터 없음
+% [수정] STA 3: RA, 데이터 없음 (queue_size = 0)
 STAs_mode(3).mode = 0;
 STAs_mode(3).OBO = 0;
-STAs_mode(3).Queue = [];
+STAs_mode(3).queue_size = 0;
+STAs_mode(3).queue_total_bytes = 0;
 
 STAs_mode = UORA(STAs_mode, 1);
 
@@ -141,10 +140,13 @@ total_tests = total_tests + 1;
 if STAs_mode(1).accessed_RA_RU > 0 && ...
    STAs_mode(2).accessed_RA_RU == 0 && ...
    STAs_mode(3).accessed_RA_RU == 0
-    fprintf('  ✅ PASS: RA 모드 + 데이터 있는 단말만 참여\n');
+    fprintf('  ✅ PASS: RA 모드 + queue_size > 0 단말만 참여\n');
     passed_tests = passed_tests + 1;
 else
     fprintf('  ❌ FAIL: 참여 조건 필터링 오류\n');
+    fprintf('    STA 1 (RA, Data): %d (예상 >0)\n', STAs_mode(1).accessed_RA_RU);
+    fprintf('    STA 2 (SA, Data): %d (예상 0)\n', STAs_mode(2).accessed_RA_RU);
+    fprintf('    STA 3 (RA, NoData): %d (예상 0)\n', STAs_mode(3).accessed_RA_RU);
 end
 
 fprintf('\n');

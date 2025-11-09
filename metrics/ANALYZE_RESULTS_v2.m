@@ -53,14 +53,9 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.packet_level.p95_delay = prctile(queuing_delays, 95);
         results.packet_level.p99_delay = prctile(queuing_delays, 99);
         
-        % % 지연 샘플 저장 (시각화용)
-        % results.packet_level.delay_samples = queuing_delays;
-        % results.packet_level.num_samples = length(queuing_delays);
-        [counts, edges] = histcounts(queuing_delays, 50);
-        results.packet_level.histogram_counts = counts;
-        results.packet_level.histogram_edges = edges;
-    
-    results.packet_level.num_samples = length(queuing_delays);
+        % 지연 샘플 저장 (시각화용)
+        results.packet_level.delay_samples = queuing_delays;
+        results.packet_level.num_samples = length(queuing_delays);
     else
         % 지연 샘플 없음
         results.packet_level = struct();
@@ -79,14 +74,14 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         warning('No valid delay samples found');
     end
     
-    % 분할 전송 지연 (선택적)
+    % [개선] T_frag (단편화 지연) 집계
     valid_frag_idx = 1:metrics.packet_level.frag_idx;
-    frag_delays = metrics.packet_level.frag_delays(valid_frag_idx);
-    frag_delays = frag_delays(~isnan(frag_delays) & frag_delays > 0);
+    all_frag_delays = metrics.packet_level.frag_delays(valid_frag_idx);
+    all_frag_delays = all_frag_delays(~isnan(all_frag_delays) & all_frag_delays >= 0);
     
-    if ~isempty(frag_delays)
-        results.packet_level.mean_frag_delay = mean(frag_delays);
-        results.packet_level.num_fragmented = length(frag_delays);
+    if ~isempty(all_frag_delays)
+        results.packet_level.mean_frag_delay = mean(all_frag_delays);
+        results.packet_level.num_fragmented = length(all_frag_delays);
     else
         results.packet_level.mean_frag_delay = 0;
         results.packet_level.num_fragmented = 0;
@@ -188,65 +183,67 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.bsr.implicit_ratio = 0;
     end
     
-    % BSR 대기 지연 집계
-    all_bsr_delays = [];
+    % [개선] 지연 분해 집계 (T_uora, T_sched)
+    total_decomp_samples = sum([STAs.delay_decomp_idx]);
+    all_uora_delays = nan(total_decomp_samples, 1);
+    all_sched_delays = nan(total_decomp_samples, 1);
+    current_idx = 0;
+
     for i = 1:length(STAs)
-        if STAs(i).bsr_idx > 0  % ⭐ 안전 체크
-            valid_idx = 1:STAs(i).bsr_idx;
-            bsr_delays = STAs(i).bsr_delays(valid_idx);
-            bsr_delays = bsr_delays(~isnan(bsr_delays) & bsr_delays >= 0);
-            all_bsr_delays = [all_bsr_delays; bsr_delays]; %#ok<AGROW>
+        num_samples_sta = STAs(i).delay_decomp_idx;
+        if num_samples_sta > 0
+            % T_uora 집계
+            valid_uora = STAs(i).uora_delays(1:num_samples_sta);
+            valid_uora = valid_uora(~isnan(valid_uora) & valid_uora >= 0);
+            
+            % T_sched 집계
+            valid_sched = STAs(i).sched_delays(1:num_samples_sta);
+            valid_sched = valid_sched(~isnan(valid_sched) & valid_sched >= 0);
+            
+            num_valid = length(valid_uora); % uora와 sched는 쌍이므로
+            
+            if num_valid > 0
+                all_uora_delays(current_idx + 1 : current_idx + num_valid) = valid_uora;
+                all_sched_delays(current_idx + 1 : current_idx + num_valid) = valid_sched;
+                current_idx = current_idx + num_valid;
+            end
         end
     end
+    all_uora_delays = all_uora_delays(1:current_idx);
+    all_sched_delays = all_sched_delays(1:current_idx);
 
-    if ~isempty(all_bsr_delays) && length(all_bsr_delays) > 0
-        results.bsr.mean_waiting_delay = mean(all_bsr_delays);
-        results.bsr.median_waiting_delay = median(all_bsr_delays);
-        results.bsr.std_waiting_delay = std(all_bsr_delays);
-        results.bsr.p90_waiting_delay = prctile(all_bsr_delays, 90);
-        results.bsr.num_bsr_waits = length(all_bsr_delays);
-        
-        % ⭐⭐⭐ 핵심 지표: BSR 지연 비율 계산 (안전 버전)
-        % 조건:
-        % 1. 완료된 패킷이 있어야 함
-        % 2. 큐잉 지연 샘플이 있어야 함
-        % 3. BSR 대기 샘플이 있어야 함
-        
-        has_packet_delays = isfield(results, 'packet_level') && ...
-                        isfield(results.packet_level, 'num_samples') && ...
-                        results.packet_level.num_samples > 0;
-        
-        if has_packet_delays
-            % 총 큐잉 지연 (초 단위)
-            total_queuing_delay_sec = results.packet_level.mean_delay * results.packet_level.num_samples;
-            
-            % 총 BSR 대기 지연 (초 단위)
-            total_bsr_waiting_delay_sec = results.bsr.mean_waiting_delay * results.bsr.num_bsr_waits;
-            
-            % 안전한 나누기 (분모가 0이 아닌지 확인)
-            if total_queuing_delay_sec > 0
-                results.bsr.bsr_delay_ratio = (total_bsr_waiting_delay_sec / total_queuing_delay_sec) * 100;
-                
-                % ⭐ 상한 체크 (100% 초과 방지)
-                % BSR 지연이 전체 큐잉 지연보다 클 수 없음
-                if results.bsr.bsr_delay_ratio > 100
-                    results.bsr.bsr_delay_ratio = 100.0;
-                end
-            else
-                results.bsr.bsr_delay_ratio = NaN;
-            end
-        else
-            results.bsr.bsr_delay_ratio = NaN;
-        end
-        
+    % T_uora 통계
+    if ~isempty(all_uora_delays)
+        results.bsr.mean_uora_delay = mean(all_uora_delays);
+        results.bsr.median_uora_delay = median(all_uora_delays);
+        results.bsr.p90_uora_delay = prctile(all_uora_delays, 90);
+        results.bsr.num_uora_samples = length(all_uora_delays);
     else
-        % BSR 대기 데이터가 없는 경우
-        results.bsr.mean_waiting_delay = NaN;
-        results.bsr.median_waiting_delay = NaN;
-        results.bsr.std_waiting_delay = NaN;
-        results.bsr.p90_waiting_delay = NaN;
-        results.bsr.num_bsr_waits = 0;
-        results.bsr.bsr_delay_ratio = NaN;
+        results.bsr.mean_uora_delay = NaN;
+        results.bsr.median_uora_delay = NaN;
+        results.bsr.p90_uora_delay = NaN;
+        results.bsr.num_uora_samples = 0;
+    end
+    
+    % T_sched 통계
+    if ~isempty(all_sched_delays)
+        results.bsr.mean_sched_delay = mean(all_sched_delays);
+        results.bsr.median_sched_delay = median(all_sched_delays);
+        results.bsr.p90_sched_delay = prctile(all_sched_delays, 90);
+        results.bsr.num_sched_samples = length(all_sched_delays);
+    else
+        results.bsr.mean_sched_delay = NaN;
+        results.bsr.median_sched_delay = NaN;
+        results.bsr.p90_sched_delay = NaN;
+        results.bsr.num_sched_samples = 0;
+    end
+
+    % [개선] BSR 대기 발생 패킷 비율 (Metric A)
+    total_completed_pkts = metrics.cumulative.total_completed_pkts;
+    if total_completed_pkts > 0
+        results.bsr.bsr_affected_packet_ratio = results.bsr.num_uora_samples / total_completed_pkts;
+    else
+        results.bsr.bsr_affected_packet_ratio = NaN;
     end
 
     if cfg.collect_bsr_trace
@@ -436,18 +433,10 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.summary.buffer_empty_ratio = NaN;
     end
     
-    % ⭐ NaN 체크 후 summary에 추가
-    if ~isnan(results.bsr.mean_waiting_delay)
-        results.summary.bsr_waiting_delay_ms = results.bsr.mean_waiting_delay * 1000;
-    else
-        results.summary.bsr_waiting_delay_ms = NaN;
-    end
-
-    if ~isnan(results.bsr.bsr_delay_ratio)
-        results.summary.bsr_delay_ratio = results.bsr.bsr_delay_ratio;
-    else
-        results.summary.bsr_delay_ratio = NaN;
-    end
+    % [개선] 지연 분해 요약 (ms 단위)
+    results.summary.mean_uora_delay_ms = results.bsr.mean_uora_delay * 1000;
+    results.summary.mean_sched_delay_ms = results.bsr.mean_sched_delay * 1000;
+    results.summary.mean_frag_delay_ms = results.packet_level.mean_frag_delay * 1000;
     
     % 공평성
     results.summary.jain_index = results.fairness.jain_index;
