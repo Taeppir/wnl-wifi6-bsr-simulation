@@ -135,8 +135,8 @@ function cfg = config_default()
     %  사전 할당 크기 ⭐
     %  =====================================================================
     
-    cfg.max_packets_per_sta = 10000;
-    cfg.max_delays = 20000;
+    cfg.max_packets_per_sta = 2000;
+    cfg.max_delays = 30000;
     
     
     if cfg.verbose >= 2

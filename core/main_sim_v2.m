@@ -258,6 +258,10 @@ function print_results_summary(results)
     fprintf('  Implicit: %d회\n', results.bsr.total_implicit);
     fprintf('  Implicit 비율: %.1f%%\n', results.summary.implicit_bsr_ratio * 100);
     
+    if isfield(results.summary, 'buffer_empty_ratio') && ~isnan(results.summary.buffer_empty_ratio)
+            fprintf('  버퍼 비어있음 비율: %.1f%%\n', results.summary.buffer_empty_ratio * 100);
+    end
+
     if isfield(results.bsr, 'mean_error') && ~isnan(results.bsr.mean_error)
         fprintf('  평균 오차: %.1f bytes\n', results.bsr.mean_error);
         fprintf('  감소 적용 빈도: %.1f%%\n', results.bsr.reduction_frequency * 100);
