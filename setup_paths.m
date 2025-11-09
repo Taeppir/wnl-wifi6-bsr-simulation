@@ -12,6 +12,7 @@ folders = {
     'config'
     'initialization'
     'traffic'
+    'traffic/experiments'
     'core'
     'policies'
     'metrics'
