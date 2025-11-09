@@ -19,6 +19,7 @@ function [R, STAs] = compute_bsr_v1(STAs, sta_idx, Q_current, cfg)
     Q_prev = STAs(sta_idx).Q_prev;
     
     % 파라미터
+    sensitivity = cfg.v1_sensitivity;
     fixed_reduction = cfg.v1_fixed_reduction_bytes;
     burst_threshold = cfg.burst_threshold;
     reduction_threshold = cfg.reduction_threshold;
@@ -37,7 +38,8 @@ function [R, STAs] = compute_bsr_v1(STAs, sta_idx, Q_current, cfg)
     else
         if delta_Q <= 0
             % 고정량 감소
-            R = max(0, Q_current - fixed_reduction);
+            actual_reduction = sensitivity * fixed_reduction;
+            R = max(0, Q_current - actual_reduction);
         else
             % 증가 추세이면 R=Q
             R = Q_current;
