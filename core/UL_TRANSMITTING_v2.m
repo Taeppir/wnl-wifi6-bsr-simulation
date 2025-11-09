@@ -1,4 +1,4 @@
-function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg, metrics)
+function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_start_time, tx_complete_time, cfg, metrics)
 % UL_TRANSMITTING_V2: 상향링크 전송 (RA-RU + SA-RU 통합)
 %
 % 입력:
@@ -29,10 +29,14 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
     max_completions = cfg.numRU_SA;
 
     tx_log.completed_packets = struct( ...
-    'sta_idx', {}, 'packet_idx', {}, ...
-    'arrival_time', {}, 'tx_complete_time', {}, ...
-    'first_tx_time', {}, 'queuing_delay', {}, ...
-    'fragmentation_delay', {});
+        'sta_idx', num2cell(nan(max_completions, 1)), ...
+        'packet_idx', num2cell(nan(max_completions, 1)), ...
+        'arrival_time', num2cell(nan(max_completions, 1)), ...
+        'tx_complete_time', num2cell(nan(max_completions, 1)), ...
+        'first_tx_time', num2cell(nan(max_completions, 1)), ...
+        'queuing_delay', num2cell(nan(max_completions, 1)), ...
+        'fragmentation_delay', num2cell(nan(max_completions, 1)), ...
+        'is_bsr_wait_packet', num2cell(false(max_completions, 1)));
 
     log_idx = 0;
     bytes_per_RU = cfg.size_MPDU;
@@ -55,7 +59,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             tx_log.num_ra_idle = tx_log.num_ra_idle + 1;
             
         elseif num_accessed == 1
-            % ✅ 성공: Explicit BSR 전송
+            % 성공: Explicit BSR 전송
             tx_log.num_ra_success = tx_log.num_ra_success + 1;
             
             sta_idx = accessed_STAs(1);
@@ -74,10 +78,13 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
                 [STAs, AP] = UPDATE_BSR_AND_MODE(STAs, AP, sta_idx, R_explicit);
                 
                 tx_log.num_explicit_bsr = tx_log.num_explicit_bsr + 1;
+
+                % 지연 분해를 위해 BSR 성공 시각(T_bsr_success) 기록
+                STAs(sta_idx).last_bsr_success_time = tx_complete_time;
             end
             
         else
-            % ❌ 충돌
+            % 충돌
             tx_log.num_ra_collision = tx_log.num_ra_collision + 1;
             
             % OCW 증가 (Binary Exponential Backoff)
@@ -102,8 +109,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         
         sta_idx = assigned_sta;
         
-        % 큐가 비어있으면 스킵
-        % [개선] 큐가 비어있는지 확인 (size 변수 사용)
+        % 큐가 비어있는지 확인
         if STAs(sta_idx).queue_size == 0
             continue;
         end
@@ -129,8 +135,8 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         STAs(sta_idx).queue_total_bytes = STAs(sta_idx).queue_total_bytes - actual_tx_bytes;
         
         % 첫 전송 시각 기록
-        if isempty(STAs(sta_idx).Queue(1).first_tx_time)
-            STAs(sta_idx).Queue(1).first_tx_time = tx_complete_time;
+        if isempty(STAs(sta_idx).Queue(head_idx).first_tx_time)
+            STAs(sta_idx).Queue(head_idx).first_tx_time = tx_start_time;
         end
         
         % 전송 통계 업데이트
@@ -140,7 +146,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         tx_log.total_tx_bytes = tx_log.total_tx_bytes + actual_tx_bytes;
         
         %% =================================================================
-        %  Step 3.3: 패킷 완료 처리
+        %  Step 3.3: 패킷 완료 처리 (Dequeue)
         %  =================================================================
         
         if new_remaining_size <= 0
@@ -154,11 +160,17 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             completed_pkt_info.packet_idx = pkt.packet_idx;
             completed_pkt_info.arrival_time = pkt.arrival_time;
             completed_pkt_info.tx_complete_time = tx_complete_time;
-            completed_pkt_info.first_tx_time = STAs(sta_idx).Queue(1).first_tx_time;
+
+
+            completed_pkt_info.first_tx_time = pkt.first_tx_time;
             completed_pkt_info.queuing_delay = tx_complete_time - pkt.arrival_time;
+
             completed_pkt_info.fragmentation_delay = ...
-                tx_complete_time - STAs(sta_idx).Queue(1).first_tx_time;
+                tx_complete_time - pkt.first_tx_time;
             
+            % BSR 대기 패킷 플래그 복사
+            completed_pkt_info.is_bsr_wait_packet = pkt.is_bsr_wait_packet;
+
             % 사전 할당된 로그에 저장
             log_idx = log_idx + 1;
             if log_idx <= max_completions
@@ -168,8 +180,7 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
                 warning('UL_TRANSMITTING_v2: completed_packets 사전 할당 크기 초과');
             end
             
-            % [개선] 큐에서 제거 (head 포인터 이동 및 size 감소)
-            % (데이터를 실제로 지우지 않음)
+            % 큐에서 제거 (head 포인터 이동 및 size 감소) (데이터를 실제로 지우지 않음)
             STAs(sta_idx).queue_head = mod(head_idx, STAs(sta_idx).queue_max_size) + 1;
             STAs(sta_idx).queue_size = STAs(sta_idx).queue_size - 1;
         end

@@ -53,8 +53,14 @@ function STAs = UPDATE_QUE(STAs, current_time)
                     'total_size', pkt.total_size, ...
                     'arrival_time', pkt.arrival_time, ...
                     'remaining_size', pkt.total_size, ...
-                    'first_tx_time', []);
+                    'first_tx_time', [], ...
+                    'is_bsr_wait_packet', false);
                 
+                % [개선] 큐가 비어있었고, 지금 추가되는 첫 패킷(k=1)인가?
+                if is_queue_empty_before_add && k == 1
+                    queue_entry.is_bsr_wait_packet = true;
+                end
+
                 % tail 위치에 패킷 삽입
                 tail_idx = STAs(i).queue_tail;
                 STAs(i).Queue(tail_idx) = queue_entry;

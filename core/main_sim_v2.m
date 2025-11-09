@@ -102,13 +102,14 @@ function [results, metrics] = main_sim_v2(cfg)
         % (cfg.size_MPDU / cfg.data_rate_per_RU)가 평균 전송 시간
         
         data_tx_time = (cfg.size_MPDU * 8) / cfg.data_rate_per_RU;
-        
+        tx_start_time = current_time;
+
         t_next = current_time + data_tx_time + cfg.len_PHY_headers;
         if t_next > cfg.simulation_time, break; end
         tx_complete_time = t_next; % 전송 완료 시각
         
         % ⭐ v2 함수 호출
-        [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_complete_time, cfg, metrics);
+        [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx_start_time, tx_complete_time, cfg, metrics);
         
         current_time = tx_complete_time;
         

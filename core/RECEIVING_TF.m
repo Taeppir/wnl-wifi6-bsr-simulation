@@ -22,7 +22,8 @@ function STAs = RECEIVING_TF(STAs, RUs, AP, cfg, current_time)
     
     BSR_STAs = [];
     if ~isempty(AP.BSR)
-        BSR_STAs = [AP.BSR.STA_ID];
+        valid_mask = ~isnan([AP.BSR.Buffer_Status]);
+        BSR_STAs = [AP.BSR(valid_mask).STA_ID];
     end
     
     %% =====================================================================
@@ -49,16 +50,38 @@ function STAs = RECEIVING_TF(STAs, RUs, AP, cfg, current_time)
             % ─────────────────────────────────────────────────────────
             
             if STAs(i).is_waiting_for_first_SA
-                % 지연 = 현재 시각 - 대기 시작 시각
-                delay = current_time - STAs(i).wait_start_time;
+                
+                T_arrival = STAs(i).wait_start_time;
+                T_bsr_success = STAs(i).last_bsr_success_time;
+                T_ru_assigned = current_time; % 현재 시각
+                
+                % BSR 성공 시각(T_bsr_success)이 기록되었는지 확인
+                if T_bsr_success > T_arrival
+                    % Case A: Explicit BSR 성공 후 SA-RU 할당
+                    T_uora = T_bsr_success - T_arrival;
+                    T_sched = T_ru_assigned - T_bsr_success;
+                else
+                    % Case B: BSR 성공 전에 SA-RU를 받은 경우
+                    % (예: Implicit BSR이 더 빨랐거나, T_bsr_success 기록 실패)
+                    % 이 경우 T_uora = 0, T_sched = T_ru_assigned - T_arrival
+                    T_uora = 0;
+                    T_sched = T_ru_assigned - T_arrival;
+                end
                 
                 % 사전 할당된 배열에 저장
-                idx = STAs(i).bsr_idx + 1;
-                STAs(i).bsr_delays(idx) = delay;
-                STAs(i).bsr_idx = idx;
+                idx = STAs(i).delay_decomp_idx + 1;
                 
-                % 대기 종료
+                if idx <= length(STAs(i).uora_delays)
+                    STAs(i).uora_delays(idx) = T_uora;
+                    STAs(i).sched_delays(idx) = T_sched;
+                    STAs(i).delay_decomp_idx = idx;
+                else
+                    warning('STA %d: 지연 분해(delay_decomp) 배열 크기 초과', i);
+                end
+                
+                % 대기 종료 및 임시 변수 리셋
                 STAs(i).is_waiting_for_first_SA = false;
+                STAs(i).last_bsr_success_time = 0; 
             end
             
             % ─────────────────────────────────────────────────────────
