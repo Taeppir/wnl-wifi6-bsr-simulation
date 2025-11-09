@@ -16,6 +16,7 @@ fprintf('========================================\n\n');
 cfg = config_default();
 cfg.simulation_time = 10.0;
 cfg.warmup_time = 0.0;
+cfg.collect_bsr_trace = false;
 cfg.verbose = 0;
 
 total_tests = 0;
@@ -129,20 +130,51 @@ actual_load = generated_load_bps / total_capacity;
 
 load_error = abs(actual_load - cfg.L_cell) / cfg.L_cell;
 
-fprintf('  생성된 부하: %.2f%%\n', actual_load * 100);
+fprintf('  생성된 부하 (1회 샘플): %.2f%%\n', actual_load * 100);
 fprintf('  목표 부하: %.2f%%\n', cfg.L_cell * 100);
 fprintf('  오차: %.1f%%\n', load_error * 100);
 
 total_tests = total_tests + 1;
 
 if load_error < 0.15
-    fprintf('  ✅ PASS: 부하 오차 < 15%%\n');
+    fprintf('  ✅ PASS: 단일 실행 부하 오차 < 15%%\n');
     passed_tests = passed_tests + 1;
 else
-    fprintf('  ⚠️  WARNING: 부하 오차 큼 (%.1f%%)\n', load_error * 100);
+    fprintf('  ⚠️  WARNING: 단일 실행 부하 오차 큼 (%.1f%%)\n', load_error * 100);
     fprintf('      (Pareto On-Off는 변동성이 큼)\n');
     passed_tests = passed_tests + 1;  % 경고만
 end
+fprintf('\n');
+% 다중 실행을 통한 평균 부하 검증 (λ_on 보정 확인)
+num_trials = 30;
+load_samples = nan(num_trials, 1);
+
+for trial = 1:num_trials
+    rng(1000 + trial);
+    trial_cfg = cfg;
+    STAs_trial = DEFINE_STAs_v2(trial_cfg.num_STAs, trial_cfg.OCW_min, trial_cfg);
+    STAs_trial = gen_onoff_pareto_v2(STAs_trial, trial_cfg);
+
+    packets_trial = sum([STAs_trial.num_of_packets]);
+    data_trial = packets_trial * trial_cfg.size_MPDU * 8;
+    load_samples(trial) = (data_trial / trial_cfg.simulation_time) / total_capacity;
+end
+
+avg_load = mean(load_samples);
+std_load = std(load_samples);
+
+fprintf('  다중 실행 평균 부하: %.2f%% (±%.2f%%)\n', avg_load * 100, std_load * 100);
+fprintf('  λ_on 사용시 기대 부하: %.2f%%\n', cfg.L_cell * 100);
+
+total_tests = total_tests + 1;
+
+if abs(avg_load - cfg.L_cell) < 0.05
+    fprintf('  ✅ PASS: 평균 부하가 목표와 일치 (|Δ| < 5%%pt)\n');
+    passed_tests = passed_tests + 1;
+else
+    fprintf('  ❌ FAIL: 평균 부하 편차 큼 (|Δ| = %.2f%%pt)\n', abs(avg_load - cfg.L_cell) * 100);
+end
+
 
 fprintf('\n');
 

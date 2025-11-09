@@ -109,10 +109,7 @@ for L = loads
     cfg_load.scheme_id = 0;
     cfg_load.verbose = 0;
     
-    % Lambda 재계산
-    total_capacity = cfg_load.numRU_SA * cfg_load.data_rate_per_RU;
-    cfg_load.lambda_network = cfg_load.L_cell * total_capacity / (cfg_load.size_MPDU * 8);
-    cfg_load.lambda = cfg_load.lambda_network / cfg_load.num_STAs;
+    cfg_load = recompute_pareto_lambda(cfg_load);
     
     try
         r = main_sim_v2(cfg_load);

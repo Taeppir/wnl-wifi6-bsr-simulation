@@ -53,9 +53,14 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.packet_level.p95_delay = prctile(queuing_delays, 95);
         results.packet_level.p99_delay = prctile(queuing_delays, 99);
         
-        % 지연 샘플 저장 (시각화용)
-        results.packet_level.delay_samples = queuing_delays;
-        results.packet_level.num_samples = length(queuing_delays);
+        % % 지연 샘플 저장 (시각화용)
+        % results.packet_level.delay_samples = queuing_delays;
+        % results.packet_level.num_samples = length(queuing_delays);
+        [counts, edges] = histcounts(queuing_delays, 50);
+        results.packet_level.histogram_counts = counts;
+        results.packet_level.histogram_edges = edges;
+    
+    results.packet_level.num_samples = length(queuing_delays);
     else
         % 지연 샘플 없음
         results.packet_level = struct();
@@ -183,24 +188,111 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.bsr.implicit_ratio = 0;
     end
     
-    % BSR 정확도 분석 (정책 활성화 시)
-    if cfg.collect_bsr_trace && metrics.policy_level.policy_idx > 0
-        valid_policy_idx = 1:metrics.policy_level.policy_idx;
+    % BSR 대기 지연 집계
+    all_bsr_delays = [];
+    for i = 1:length(STAs)
+        if STAs(i).bsr_idx > 0  % ⭐ 안전 체크
+            valid_idx = 1:STAs(i).bsr_idx;
+            bsr_delays = STAs(i).bsr_delays(valid_idx);
+            bsr_delays = bsr_delays(~isnan(bsr_delays) & bsr_delays >= 0);
+            all_bsr_delays = [all_bsr_delays; bsr_delays]; %#ok<AGROW>
+        end
+    end
+
+    if ~isempty(all_bsr_delays) && length(all_bsr_delays) > 0
+        results.bsr.mean_waiting_delay = mean(all_bsr_delays);
+        results.bsr.median_waiting_delay = median(all_bsr_delays);
+        results.bsr.std_waiting_delay = std(all_bsr_delays);
+        results.bsr.p90_waiting_delay = prctile(all_bsr_delays, 90);
+        results.bsr.num_bsr_waits = length(all_bsr_delays);
         
-        bsr_errors = metrics.policy_level.bsr_errors(valid_policy_idx);
-        bsr_errors = bsr_errors(~isnan(bsr_errors));
+        % ⭐⭐⭐ 핵심 지표: BSR 지연 비율 계산 (안전 버전)
+        % 조건:
+        % 1. 완료된 패킷이 있어야 함
+        % 2. 큐잉 지연 샘플이 있어야 함
+        % 3. BSR 대기 샘플이 있어야 함
         
-        if ~isempty(bsr_errors)
-            results.bsr.mean_error = mean(bsr_errors);
-            results.bsr.median_error = median(bsr_errors);
-            results.bsr.p90_error = prctile(bsr_errors, 90);
+        has_packet_delays = isfield(results, 'packet_level') && ...
+                        isfield(results.packet_level, 'num_samples') && ...
+                        results.packet_level.num_samples > 0;
+        
+        if has_packet_delays
+            % 총 큐잉 지연 (초 단위)
+            total_queuing_delay_sec = results.packet_level.mean_delay * results.packet_level.num_samples;
             
-            % 감소 적용 빈도
-            reduction_flags = metrics.policy_level.reduction_applied(valid_policy_idx);
-            results.bsr.reduction_frequency = sum(reduction_flags) / length(reduction_flags);
+            % 총 BSR 대기 지연 (초 단위)
+            total_bsr_waiting_delay_sec = results.bsr.mean_waiting_delay * results.bsr.num_bsr_waits;
             
-            % 정책 안정성 (R=Q ↔ R<Q 전환 횟수)
-            results.bsr.stability_switches = metrics.policy_level.stability_switches;
+            % 안전한 나누기 (분모가 0이 아닌지 확인)
+            if total_queuing_delay_sec > 0
+                results.bsr.bsr_delay_ratio = (total_bsr_waiting_delay_sec / total_queuing_delay_sec) * 100;
+                
+                % ⭐ 상한 체크 (100% 초과 방지)
+                % BSR 지연이 전체 큐잉 지연보다 클 수 없음
+                if results.bsr.bsr_delay_ratio > 100
+                    results.bsr.bsr_delay_ratio = 100.0;
+                end
+            else
+                results.bsr.bsr_delay_ratio = NaN;
+            end
+        else
+            results.bsr.bsr_delay_ratio = NaN;
+        end
+        
+    else
+        % BSR 대기 데이터가 없는 경우
+        results.bsr.mean_waiting_delay = NaN;
+        results.bsr.median_waiting_delay = NaN;
+        results.bsr.std_waiting_delay = NaN;
+        results.bsr.p90_waiting_delay = NaN;
+        results.bsr.num_bsr_waits = 0;
+        results.bsr.bsr_delay_ratio = NaN;
+    end
+
+    if cfg.collect_bsr_trace
+        % 버퍼 비어 있는 비율 계산 (Q=0인 샘플 수 / 전체 샘플 수)
+        if metrics.policy_level.trace_idx > 0
+            valid_trace_idx = 1:metrics.policy_level.trace_idx;
+            Q_samples = metrics.policy_level.trace.Q(valid_trace_idx);
+            Q_samples = Q_samples(~isnan(Q_samples));
+
+            if ~isempty(Q_samples)
+                empty_count = sum(Q_samples == 0);
+                results.bsr.buffer_empty_count = empty_count;
+                results.bsr.buffer_empty_ratio = empty_count / numel(Q_samples);
+            else
+                results.bsr.buffer_empty_count = 0;
+                results.bsr.buffer_empty_ratio = NaN;
+            end
+        else
+            results.bsr.buffer_empty_count = 0;
+            results.bsr.buffer_empty_ratio = NaN;
+        end
+
+        if metrics.policy_level.policy_idx > 0
+            valid_policy_idx = 1:metrics.policy_level.policy_idx;
+
+            bsr_errors = metrics.policy_level.bsr_errors(valid_policy_idx);
+            bsr_errors = bsr_errors(~isnan(bsr_errors));
+
+            if ~isempty(bsr_errors)
+                results.bsr.mean_error = mean(bsr_errors);
+                results.bsr.median_error = median(bsr_errors);
+                results.bsr.p90_error = prctile(bsr_errors, 90);
+
+                % 감소 적용 빈도
+                reduction_flags = metrics.policy_level.reduction_applied(valid_policy_idx);
+                results.bsr.reduction_frequency = sum(reduction_flags) / length(reduction_flags);
+
+                % 정책 안정성 (R=Q ↔ R<Q 전환 횟수)
+                results.bsr.stability_switches = metrics.policy_level.stability_switches;
+            else
+                results.bsr.mean_error = NaN;
+                results.bsr.median_error = NaN;
+                results.bsr.p90_error = NaN;
+                results.bsr.reduction_frequency = NaN;
+                results.bsr.stability_switches = 0;
+            end
         else
             results.bsr.mean_error = NaN;
             results.bsr.median_error = NaN;
@@ -210,9 +302,16 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         end
     else
         % BSR 추적 비활성화
+        results.bsr.buffer_empty_count = NaN;
+        results.bsr.buffer_empty_ratio = NaN;
         results.bsr.mean_error = NaN;
+        results.bsr.median_error = NaN;
+        results.bsr.p90_error = NaN;
         results.bsr.reduction_frequency = NaN;
+        results.bsr.stability_switches = 0;
     end
+
+
     
     %% =====================================================================
     %  5. Fairness 분석 (단말별)
@@ -319,6 +418,7 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     results.summary.mean_delay_ms = results.packet_level.mean_delay * 1000;
     results.summary.p90_delay_ms = results.packet_level.p90_delay * 1000;
     results.summary.p99_delay_ms = results.packet_level.p99_delay * 1000;
+    results.summary.std_delay_ms = results.packet_level.std_delay * 1000;
     
     % 처리율
     results.summary.throughput_mbps = results.throughput.throughput_mbps;
@@ -330,6 +430,24 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     
     % BSR
     results.summary.implicit_bsr_ratio = results.bsr.implicit_ratio;
+    if isfield(results.bsr, 'buffer_empty_ratio')
+        results.summary.buffer_empty_ratio = results.bsr.buffer_empty_ratio;
+    else
+        results.summary.buffer_empty_ratio = NaN;
+    end
+    
+    % ⭐ NaN 체크 후 summary에 추가
+    if ~isnan(results.bsr.mean_waiting_delay)
+        results.summary.bsr_waiting_delay_ms = results.bsr.mean_waiting_delay * 1000;
+    else
+        results.summary.bsr_waiting_delay_ms = NaN;
+    end
+
+    if ~isnan(results.bsr.bsr_delay_ratio)
+        results.summary.bsr_delay_ratio = results.bsr.bsr_delay_ratio;
+    else
+        results.summary.bsr_delay_ratio = NaN;
+    end
     
     % 공평성
     results.summary.jain_index = results.fairness.jain_index;

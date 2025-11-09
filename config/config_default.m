@@ -65,15 +65,21 @@ function cfg = config_default()
     cfg.alpha = 1.5;
     cfg.mu_on = 0.05;
     cfg.mu_off = 0.05;
-    cfg.rho = cfg.mu_on / (cfg.mu_on + cfg.mu_off);
-    
+    cfg.L_cell = 0.2;
+    cfg = recompute_pareto_lambda(cfg);
     total_capacity = cfg.numRU_SA * cfg.data_rate_per_RU;
+
+    % cfg.rho = cfg.mu_on / (cfg.mu_on + cfg.mu_off); % rho = 0.5
     
-    cfg.L_cell = 0.5;
-    
-    cfg.lambda_network = cfg.L_cell * total_capacity / (cfg.size_MPDU * 8);
-    
-    cfg.lambda = cfg.lambda_network / cfg.num_STAs;
+
+    % % 원하는 평균 부하 설정
+    % lambda_avg_network = cfg.L_cell * total_capacity / (cfg.size_MPDU * 8);
+
+    % % On/Off 트래픽이면 On-rate로 보정
+    % lambda_on_network = lambda_avg_network / cfg.rho;
+
+    % cfg.lambda = lambda_on_network / cfg.num_STAs;
+
     
     % 디버그 출력
     if cfg.verbose >= 2
@@ -81,10 +87,12 @@ function cfg = config_default()
         fprintf('  네트워크 용량: %.2f Mbps (%d RU × %.2f Mbps)\n', ...
             total_capacity / 1e6, cfg.numRU_SA, cfg.data_rate_per_RU / 1e6);
         fprintf('  목표 부하율: %.0f%%\n', cfg.L_cell * 100);
-        fprintf('  네트워크 전체 lambda: %.2f pkt/s\n', cfg.lambda_network);
-        fprintf('  단말당 lambda: %.2f pkt/s\n', cfg.lambda);
+        fprintf('  평균 부하 기반 λ (네트워크): %.2f pkt/s\n', cfg.lambda_avg_network);
+        fprintf('  On-상태 λ (네트워크): %.2f pkt/s\n', cfg.lambda_on_network);
+        fprintf('  평균 λ (STA당): %.2f pkt/s\n', cfg.lambda_avg_per_sta);
+        fprintf('  On-상태 λ (STA당): %.2f pkt/s\n', cfg.lambda);
         fprintf('  예상 생성 패킷: %.0f개 (%.1f초)\n', ...
-            cfg.lambda_network * cfg.simulation_time, cfg.simulation_time);
+            cfg.lambda_avg_network * cfg.simulation_time, cfg.simulation_time);
         
         % [수정] Stage당 용량 -> RU당 용량으로 변경
         fprintf('  RU당 전송 용량: %d bytes\n', cfg.size_MPDU);
@@ -127,8 +135,8 @@ function cfg = config_default()
     %  사전 할당 크기 ⭐
     %  =====================================================================
     
-    cfg.max_packets_per_sta = 10000;
-    cfg.max_delays = 20000;
+    cfg.max_packets_per_sta = 2000;
+    cfg.max_delays = 30000;
     
     
     if cfg.verbose >= 2
