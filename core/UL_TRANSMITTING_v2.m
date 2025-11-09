@@ -25,13 +25,16 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
     tx_log.num_ra_success = 0;
     tx_log.num_ra_collision = 0;
     tx_log.num_ra_idle = 0;
-    % tx_log.completed_packets = [];
+    
+    max_completions = cfg.numRU_SA;
+
     tx_log.completed_packets = struct( ...
     'sta_idx', {}, 'packet_idx', {}, ...
     'arrival_time', {}, 'tx_complete_time', {}, ...
     'first_tx_time', {}, 'queuing_delay', {}, ...
     'fragmentation_delay', {});
-    
+
+    log_idx = 0;
     bytes_per_RU = cfg.size_MPDU;
     
     %% =====================================================================
@@ -147,7 +150,13 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             completed_pkt_info.fragmentation_delay = ...
                 tx_complete_time - STAs(sta_idx).Queue(1).first_tx_time;
             
-            tx_log.completed_packets(end+1) = completed_pkt_info;
+            log_idx = log_idx + 1;
+            if log_idx <= max_completions
+                tx_log.completed_packets(log_idx) = completed_pkt_info;
+            else
+                % 이 경고가 발생하면 max_completions 계산 로직 재검토 필요
+                warning('UL_TRANSMITTING_v2: completed_packets 사전 할당 크기 초과');
+            end
             
             % 큐에서 제거
             STAs(sta_idx).Queue(1) = [];
@@ -188,11 +197,5 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
     %  5. 완료 패킷 로그 정리
     %  =====================================================================
     
-    if isempty(tx_log.completed_packets)
-        tx_log.completed_packets = struct( ...
-            'sta_idx', {}, 'packet_idx', {}, ...
-            'arrival_time', {}, 'tx_complete_time', {}, ...
-            'first_tx_time', {}, 'queuing_delay', {}, ...
-            'fragmentation_delay', {});
-    end
+    tx_log.completed_packets = tx_log.completed_packets(1:log_idx);
 end

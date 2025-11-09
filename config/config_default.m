@@ -65,21 +65,9 @@ function cfg = config_default()
     cfg.alpha = 1.5;
     cfg.mu_on = 0.05;
     cfg.mu_off = 0.05;
-    cfg.L_cell = 0.2;
+    cfg.L_cell = 0.3;
     cfg = recompute_pareto_lambda(cfg);
     total_capacity = cfg.numRU_SA * cfg.data_rate_per_RU;
-
-    % cfg.rho = cfg.mu_on / (cfg.mu_on + cfg.mu_off); % rho = 0.5
-    
-
-    % % 원하는 평균 부하 설정
-    % lambda_avg_network = cfg.L_cell * total_capacity / (cfg.size_MPDU * 8);
-
-    % % On/Off 트래픽이면 On-rate로 보정
-    % lambda_on_network = lambda_avg_network / cfg.rho;
-
-    % cfg.lambda = lambda_on_network / cfg.num_STAs;
-
     
     % 디버그 출력
     if cfg.verbose >= 2

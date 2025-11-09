@@ -17,7 +17,9 @@ function AP = DEFINE_AP(num_STAs)
     AP = struct();
     
     % BSR 테이블 (초기: 비어있음)
-    AP.BSR = struct('STA_ID', {}, 'Buffer_Status', {});
+    AP.BSR = struct(...
+        'STA_ID', num2cell(1:num_STAs)', ...
+        'Buffer_Status', num2cell(nan(num_STAs, 1)));
     
     % 통계
     AP.total_rx_data = 0;
