@@ -15,7 +15,7 @@ fprintf('========================================\n\n');
 
 cfg = config_default();
 cfg.simulation_time = 10.0;
-cfg.warmup_time = 2.0;
+cfg.warmup_time = 0.0;
 cfg.verbose = 0;
 
 total_tests = 0;
