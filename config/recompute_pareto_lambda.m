@@ -32,13 +32,18 @@ function cfg = recompute_pareto_lambda(cfg)
         return;
     end
 
+    % rho 계산
     cfg.rho = cfg.mu_on / cycle_time;
 
+    % 네트워크 용량
     total_capacity = cfg.numRU_SA * cfg.data_rate_per_RU; % [bps]
     packet_bits = cfg.size_MPDU * 8;
 
+    % 평균 lambda 계산
     cfg.lambda_avg_network = cfg.L_cell * total_capacity / packet_bits;
 
+    % On-state lambda (rho로 증폭)
+    % 평균 부하 = rho x lambda_on -> lambda_on = 평균 / rho
     if cfg.rho > 0
         cfg.lambda_on_network = cfg.lambda_avg_network / cfg.rho;
     else
