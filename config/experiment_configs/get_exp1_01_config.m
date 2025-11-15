@@ -41,7 +41,8 @@ function exp_config = get_exp1_01_config()
     exp_config.fixed.alpha = 1.5;      % Pareto shape
     exp_config.fixed.rho = 0.7;        % On-state ratio
     exp_config.fixed.mu_on = 0.05;     % 50ms On period
-    % mu_off는 recompute_pareto_lambda에서 자동 계산
+
+    exp_config.fixed.mu_off = exp_config.fixed.mu_on * (1 - exp_config.fixed.rho) / exp_config.fixed.rho;
     
     % Simulation
     exp_config.fixed.simulation_time = 10.0;

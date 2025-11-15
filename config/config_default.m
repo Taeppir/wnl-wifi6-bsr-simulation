@@ -36,7 +36,7 @@ function cfg = config_default()
     cfg.simulation_time = 10.0;
     
     % ⭐ 워밍업 시간 [sec]
-    cfg.warmup_time = 2.0;
+    cfg.warmup_time = 0.0;
     
 
     
@@ -62,9 +62,9 @@ function cfg = config_default()
     %  트래픽 모델 (Pareto On-Off)
     %  =====================================================================
     
-    cfg.alpha = 1.3;
-    cfg.mu_on = 0.1;
-    cfg.mu_off = 0.1;
+    cfg.alpha = 1.5;
+    cfg.mu_on = 0.05;
+    cfg.mu_off = 0.05;
     cfg.L_cell = 0.3;
     cfg = recompute_pareto_lambda(cfg);
     total_capacity = cfg.numRU_SA * cfg.data_rate_per_RU;
@@ -103,15 +103,15 @@ function cfg = config_default()
     cfg.v1_fixed_reduction_bytes = 500;
     cfg.v1_sensitivity = 1.0;
 
-    cfg.v2_max_reduction = 0.8;
+    cfg.v2_max_reduction = 0.7;
     cfg.v2_sensitivity = 1.0;
 
-    cfg.v3_EMA_alpha = 0.3;
+    cfg.v3_EMA_alpha = 0.2;
     cfg.v3_sensitivity = 1.0;
-    cfg.v3_max_reduction = 0.8;
+    cfg.v3_max_reduction = 0.7;
     
-    cfg.burst_threshold = 8000;
-    cfg.reduction_threshold = 1000;
+    cfg.burst_threshold = 1000;
+    cfg.reduction_threshold = 500;
     
     %% =====================================================================
     %  메트릭 수집
@@ -123,7 +123,7 @@ function cfg = config_default()
     %  사전 할당 크기 ⭐
     %  =====================================================================
     
-    cfg.max_packets_per_sta = 2000;
+    cfg.max_packets_per_sta = 5000;
     cfg.max_delays = 30000;
     
     

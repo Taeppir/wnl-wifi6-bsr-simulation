@@ -12,7 +12,7 @@ cfg = config_default();
 % 필요 시 파라미터 수정
 cfg.num_STAs = 20;
 cfg.simulation_time = 10.0;  % 짧게 (디버깅용)
-cfg.scheme_id = 3;          % v3 테스트
+cfg.scheme_id = 0;          % v3 테스트
 cfg.verbose = 1;            % 상세 출력
 
 %% 2. 시뮬레이션 실행
