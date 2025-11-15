@@ -20,7 +20,8 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
         'arrival_time', NaN, ...
         'remaining_size', NaN, ...
         'first_tx_time', [], ...
-        'is_bsr_wait_packet', false);
+        'is_bsr_wait_packet', false, ...
+        'tx_chunks', 0);
 
     for i = 1:numSTAs
         % 기본 정보
@@ -37,7 +38,7 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
         STAs(i).packet_list = [];        % 대기 큐 (도착 대기)
         STAs(i).packet_list_next_idx = 1; % [개선] packet_list에서 다음에 읽을 인덱스
 
-        % [개선] 활성 큐 (원형 큐로 구현)
+        % 활성 큐 (원형 큐로 구현)
         STAs(i).Queue = repmat(empty_packet_entry, queue_max_size, 1);
         STAs(i).queue_max_size = queue_max_size; % 큐의 최대 용량
         STAs(i).queue_head = 1;      % 읽을 위치 (첫 번째 패킷)

@@ -134,6 +134,9 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         % queue_total_bytes 업데이트 (sum() 대신)
         STAs(sta_idx).queue_total_bytes = STAs(sta_idx).queue_total_bytes - actual_tx_bytes;
         
+        % tx_chunks 카운터 증가
+        STAs(sta_idx).Queue(head_idx).tx_chunks = STAs(sta_idx).Queue(head_idx).tx_chunks + 1;
+
         % 첫 전송 시각 기록
         if isempty(STAs(sta_idx).Queue(head_idx).first_tx_time)
             STAs(sta_idx).Queue(head_idx).first_tx_time = tx_start_time;
@@ -165,8 +168,13 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             completed_pkt_info.first_tx_time = pkt.first_tx_time;
             completed_pkt_info.queuing_delay = tx_complete_time - pkt.arrival_time;
 
-            completed_pkt_info.fragmentation_delay = ...
-                tx_complete_time - pkt.first_tx_time;
+            if pkt.tx_chunks > 1
+                % 2번 이상 전송됨 (단편화 발생)
+                completed_pkt_info.fragmentation_delay = tx_complete_time - pkt.first_tx_time;
+            else
+                % 1번에 전송됨 (단편화 아님)
+                completed_pkt_info.fragmentation_delay = 0;
+            end
             
             % BSR 대기 패킷 플래그 복사
             completed_pkt_info.is_bsr_wait_packet = pkt.is_bsr_wait_packet;
