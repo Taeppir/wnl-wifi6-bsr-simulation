@@ -122,6 +122,19 @@ try
     assert(isempty(tx_log1.completed_packets), 'P1이 완료되면 안 됨');
     assert(sta1.Queue(sta1.queue_head).first_tx_time == 0.7, 'T_first_tx 기록 실패');
     
+    idx = sta1.delay_decomp_idx;
+    if idx > 0
+        t_overhead_recorded = sta1.overhead_delays(idx);
+        t_overhead_expected = t_first_tx_p1 - t_ru_assigned;  % 0.7 - 0.6 = 0.1
+        
+        assert(abs(t_overhead_recorded - t_overhead_expected) < 1e-9, 'T_overhead 기록 실패');
+        fprintf('  - PASS: T_overhead 기록 (%.2f s)\n', t_overhead_recorded);
+    else
+        error('T_overhead 인덱스 없음');
+    end
+
+
+
     fprintf('  - PASS: T_first_tx(%.1f) 기록. P1 완료 안 됨.\n', t_first_tx_p1);
 
     %% ---------------------------------------------------------------------
@@ -138,14 +151,16 @@ try
     
     t_frag_p1 = tx_log2.completed_packets(1).fragmentation_delay;
     t_queuing_p1 = tx_log2.completed_packets(1).queuing_delay;
+    t_overhead_p1 = tx_log2.completed_packets(1).overhead_delay;
     
     fprintf('  - PASS: P1 완료 (T_complete=%.2f)\n', t_complete_p1);
     fprintf('  - T_frag (P1) : %.2f (%.2f - %.1f)\n', t_frag_p1, t_complete_p1, t_first_tx_p1);
+    fprintf('  - T_overhead (P1): %.2f (%.1f - %.1f)\n', t_overhead_p1, t_first_tx_p1, t_ru_assigned);
     fprintf('  - T_total (P1): %.2f (%.2f - %.1f)\n', t_queuing_p1, t_complete_p1, t_arrival_p1);
     
     % [핵심 검증 수정]
     % T_overhead(Gap) = T_first_tx - T_ru_assigned
-    t_gap = t_first_tx_p1 - t_ru_assigned;
+    t_gap = t_overhead_p1;  % ⭐ completed_packets에서 직접 가져옴
     total_decomposed_delay_p1 = t_uora + t_sched + t_gap + t_frag_p1;
     
     fprintf('  - [검증] T_overhead: %.2f (T_first_tx(%.1f) - T_ru_assigned(%.1f))\n', t_gap, t_first_tx_p1, t_ru_assigned);

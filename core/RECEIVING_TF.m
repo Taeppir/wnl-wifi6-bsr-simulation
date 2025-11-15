@@ -44,6 +44,10 @@ function STAs = RECEIVING_TF(STAs, RUs, AP, cfg, current_time)
             % ⭐ Mode는 이미 UPDATE_BSR_AND_MODE에서 설정됨
             % 여기서는 확인만
             % assert(STAs(i).mode == 1, 'STA %d should be in SA mode', i);
+
+            if isempty(STAs(i).assigned_SA_RU) || STAs(i).last_ru_assigned_time == 0
+                STAs(i).last_ru_assigned_time = current_time;
+            end
             
             % ─────────────────────────────────────────────────────────
             % BSR 대기 지연 측정 (첫 SA-RU 할당 시)
@@ -115,6 +119,7 @@ function STAs = RECEIVING_TF(STAs, RUs, AP, cfg, current_time)
             
             % RA 모드 단말은 할당 없음
             STAs(i).assigned_SA_RU = [];
+            STAs(i).last_ru_assigned_time = 0;
         end
     end
 end
