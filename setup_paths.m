@@ -9,18 +9,33 @@ root_dir = fileparts(mfilename('fullpath'));
 
 % 추가할 폴더 목록
 folders = {
+    'analysis'
+    'analysis/notebooks'
+    'analysis/scripts'
+    'analysis/toolkit'
     'config'
+    'config/experiment_configs'
+    'experiments'
+    'experiments/common'
+    'experiments/phase1'
+    'experiments/phase2'
     'initialization'
-    'traffic'
-    'traffic/experiments'
-    'core'
-    'policies'
     'metrics'
-    'utils'
+    'policies'
+    'results'
+    'results/csv'
+    'results/mat'
+    'results/publication'
+    'results/quick_plots'
     'tests'
     'tests/1_core'
     'tests/2_mechanisms'
     'tests/3_integration'
+    'traffic'
+    'traffic/experiments'
+    'core'
+    'utils'
+    
 };
 
 % 경로 추가
