@@ -58,6 +58,7 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
         STAs(i).is_waiting_for_first_SA = false;
         STAs(i).wait_start_time = 0;         % T_arrival
         STAs(i).last_bsr_success_time = 0; % T_bsr_success (중간 저장)
+        STAs(i).last_ru_assigned_time = 0;
         
         % RU 할당 정보
         STAs(i).assigned_SA_RU = [];
@@ -76,6 +77,7 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
 
         STAs(i).uora_delays = nan(max_delays, 1);   % T_uora
         STAs(i).sched_delays = nan(max_delays, 1);  % T_sched
+        STAs(i).overhead_delays = nan(max_delays, 1);
         STAs(i).delay_decomp_idx = 0; % T_uora/T_sched 공통 인덱스
         
         % 전송 완료 로그 (선택적)

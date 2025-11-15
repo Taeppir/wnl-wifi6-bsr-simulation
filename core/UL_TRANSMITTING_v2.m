@@ -36,7 +36,8 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         'first_tx_time', num2cell(nan(max_completions, 1)), ...
         'queuing_delay', num2cell(nan(max_completions, 1)), ...
         'fragmentation_delay', num2cell(nan(max_completions, 1)), ...
-        'is_bsr_wait_packet', num2cell(false(max_completions, 1)));
+        'is_bsr_wait_packet', num2cell(false(max_completions, 1)), ...
+        'overhead_delay', num2cell(nan(max_completions, 1)));
 
     log_idx = 0;
     bytes_per_RU = cfg.size_MPDU;
@@ -140,6 +141,26 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         % 첫 전송 시각 기록
         if isempty(STAs(sta_idx).Queue(head_idx).first_tx_time)
             STAs(sta_idx).Queue(head_idx).first_tx_time = tx_start_time;
+
+            % T_overhead 계산 및 저장
+            T_first_tx = tx_start_time;
+            T_ru_assigned = STAs(sta_idx).last_ru_assigned_time;
+
+            if T_ru_assigned > 0 % 유효한 타임스탬프가 있는 경우만
+                T_overhead = T_first_tx - T_ru_assigned;
+
+                % delay_decomp_idx는 RECEIVING_TF에서 이미 증가했으므로
+                % 현재 인덱스 그대로 사용
+                idx = STAs(sta_idx).delay_decomp_idx;
+                
+                if idx > 0 && idx <= length(STAs(sta_idx).overhead_delays)
+                    STAs(sta_idx).overhead_delays(idx) = T_overhead;
+                else
+                    warning('STA %d: overhead_delays 인덱스(%d) 범위 초과', sta_idx, idx);
+                end
+            else
+                warning('STA %d: last_ru_assigned_time이 기록되지 않음 (T_overhead 계산 불가)', sta_idx);
+            end
         end
         
         % 전송 통계 업데이트
@@ -178,6 +199,18 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             
             % BSR 대기 패킷 플래그 복사
             completed_pkt_info.is_bsr_wait_packet = pkt.is_bsr_wait_packet;
+
+            % T_overhead도 completed_pkt_info에 포함
+            if pkt.is_bsr_wait_packet
+                idx = STAs(sta_idx).delay_decomp_idx;
+                if idx > 0 && idx <= length(STAs(sta_idx).overhead_delays)
+                    completed_pkt_info.overhead_delay = STAs(sta_idx).overhead_delays(idx);
+                else
+                    completed_pkt_info.overhead_delay = NaN;
+                end
+            else
+                completed_pkt_info.overhead_delay = NaN;
+            end
 
             % 사전 할당된 로그에 저장
             log_idx = log_idx + 1;
