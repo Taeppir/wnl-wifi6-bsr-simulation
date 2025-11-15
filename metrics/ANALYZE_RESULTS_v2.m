@@ -193,23 +193,21 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     for i = 1:length(STAs)
         num_samples_sta = STAs(i).delay_decomp_idx;
         if num_samples_sta > 0
-            % T_uora 집계
-            valid_uora = STAs(i).uora_delays(1:num_samples_sta);
-            valid_uora = valid_uora(~isnan(valid_uora) & valid_uora >= 0);
-            
-            % T_sched 집계
-            valid_sched = STAs(i).sched_delays(1:num_samples_sta);
-            valid_sched = valid_sched(~isnan(valid_sched) & valid_sched >= 0);
+            % 1. 원본 데이터 (NaN 포함)
+            uora_raw = STAs(i).uora_delays(1:num_samples_sta);
+            sched_raw = STAs(i).sched_delays(1:num_samples_sta);
+            overhead_raw = STAs(i).overhead_delays(1:num_samples_sta);
 
-            % T_overhead 집계
-            valid_overhead = STAs(i).overhead_delays(1:num_samples_sta);
-            valid_overhead = valid_overhead(~isnan(valid_overhead) & valid_overhead >= 0);
-            
-            num_valid = length(valid_uora); % uora와 sched는 쌍이므로
+            % 2. T_uora를 기준으로 공통 마스크 생성
+            valid_mask = ~isnan(uora_raw) & uora_raw >= 0;
+            num_valid = sum(valid_mask);
             
             if num_valid > 0
-                all_uora_delays(current_idx + 1 : current_idx + num_valid) = valid_uora;
-                all_sched_delays(current_idx + 1 : current_idx + num_valid) = valid_sched;
+                % 3. 공통 마스크를 3개 벡터 모두에 적용
+                all_uora_delays(current_idx + 1 : current_idx + num_valid) = uora_raw(valid_mask);
+                all_sched_delays(current_idx + 1 : current_idx + num_valid) = sched_raw(valid_mask);
+                all_overhead_delays(current_idx + 1 : current_idx + num_valid) = overhead_raw(valid_mask);
+                
                 current_idx = current_idx + num_valid;
             end
         end
@@ -458,33 +456,6 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     results.summary.mean_frag_delay_ms = results.packet_level.mean_frag_delay * 1000;
     results.summary.mean_overhead_delay_ms = results.bsr.mean_overhead_delay * 1000;
     
-    % ⭐⭐⭐ [검증] 지연 분해 합계 확인
-    if ~isempty(all_uora_delays) && ~isempty(queuing_delays)
-        % BSR 대기 패킷만 필터링
-        bsr_wait_mask = false(length(queuing_delays), 1);
-        % (여기서는 completed_packets에서 is_bsr_wait_packet을 추출해야 함)
-        % 간단한 근사: num_uora_samples만큼의 패킷이 BSR 대기 패킷
-        
-        if current_idx > 0
-            T_total_avg = mean(queuing_delays);
-            T_decomp_sum = results.summary.mean_uora_delay_ms + ...
-                          results.summary.mean_sched_delay_ms + ...
-                          results.summary.mean_overhead_delay_ms + ...
-                          results.summary.mean_frag_delay_ms;
-            
-            decomp_error = abs(T_total_avg * 1000 - T_decomp_sum) / (T_total_avg * 1000);
-            
-            if decomp_error > 0.05  % 5% 이상 차이
-                warning('ANALYZE_RESULTS_v2: 지연 분해 합계 불일치 (오차: %.1f%%)', decomp_error * 100);
-                if cfg.verbose >= 1
-                    fprintf('  [검증] T_total(평균): %.2f ms\n', T_total_avg * 1000);
-                    fprintf('  [검증] T_decomp_sum: %.2f ms (uora+sched+overhead+frag)\n', T_decomp_sum);
-                end
-            end
-        end
-    end
-
-
     % 공평성
     results.summary.jain_index = results.fairness.jain_index;
     
