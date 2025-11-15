@@ -51,7 +51,7 @@ if any(mask)
     % 중간값 추천
     mid_idx = find(mask, 1, 'first') + floor(sum(mask)/2);
     fprintf('[추천] L_cell = %.1f\n', L(mid_idx));
-    fprintf('  - 버퍼 비율: %.1f%%\n', buffer_empty(mid_idx)*100);
+    fprintf('  - 버퍼 empty 비율: %.1f%%\n', buffer_empty(mid_idx)*100);
     fprintf('  - UORA 지연: %.2f ms\n', uora_delay(mid_idx));
     fprintf('  - 충돌률: %.1f%%\n\n', collision(mid_idx)*100);
 else
