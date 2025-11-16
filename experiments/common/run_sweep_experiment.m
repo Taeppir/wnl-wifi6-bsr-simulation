@@ -143,16 +143,6 @@ function results_grid = run_sweep_experiment(exp_config)
                 if ismember(exp_config.sweep_var, {'L_cell', 'rho', 'mu_on', 'mu_off'}) || ...
                    (is_2d && ismember(exp_config.sweep_var2, {'L_cell', 'rho', 'mu_on', 'mu_off'}))
                    
-                    if ~isfield(cfg, 'mu_off') || isempty(cfg.mu_off) || cfg.mu_off == 0
-                        if isfield(cfg, 'rho') && isfield(cfg, 'mu_on')
-                            cfg.mu_off = cfg.mu_on * (1 - cfg.rho) / cfg.rho;
-                            if cfg.verbose >= 2
-                                fprintf('  [자동 계산] mu_off = %.4f (rho=%.2f 유지)\n', cfg.mu_off, cfg.rho);
-                            end
-                        end
-                    end 
-                   
-                   
                    cfg = recompute_pareto_lambda(cfg);
                 end
                 

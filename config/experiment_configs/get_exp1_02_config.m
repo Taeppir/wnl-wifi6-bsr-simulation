@@ -29,7 +29,7 @@ function exp_config = get_exp1_02_config()
     exp_config.fixed.scheme_id = 0;  % Baseline
     exp_config.fixed.num_STAs = 20;
     
-    % ⭐ [핵심] 부하(L_cell)는 0.5로 고정
+    % ⭐ [핵심] 부하(L_cell)는 0.3로 고정
     exp_config.fixed.L_cell = 0.3;
     
     % On-period는 50ms로 고정 (mu_off는 rho에 따라 자동 계산됨)
