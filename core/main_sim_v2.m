@@ -202,6 +202,7 @@ function [results, metrics] = main_sim_v2(cfg)
         fprintf('시뮬레이션 시간: %.2f 초\n', current_time);
         fprintf('가속비: %.1fx\n\n', current_time / elapsed_total);
     end
+
     
     % v2 분석 함수 호출
     results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg);
@@ -210,6 +211,8 @@ function [results, metrics] = main_sim_v2(cfg)
         results.elapsed_time = elapsed_total;
         print_results_summary(results); % v2의 요약 프린트 함수
     end
+
+
 end
 %% =========================================================================
 %  Helper Functions

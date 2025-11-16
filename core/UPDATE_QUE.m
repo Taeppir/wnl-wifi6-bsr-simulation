@@ -79,6 +79,13 @@ function STAs = UPDATE_QUE(STAs, current_time)
             if is_queue_empty_before_add
                 STAs(i).is_waiting_for_first_SA = true;
                 STAs(i).wait_start_time = current_time;
+
+                % ⭐⭐⭐ [추가] Empty → Non-empty 전환: 빈 시간 누적
+                if STAs(i).is_buffer_currently_empty && STAs(i).buffer_empty_start_time > 0
+                    empty_duration = current_time - STAs(i).buffer_empty_start_time;
+                    STAs(i).total_buffer_empty_time = STAs(i).total_buffer_empty_time + empty_duration;
+                end
+                STAs(i).is_buffer_currently_empty = false;
             end
         end
     end
