@@ -161,30 +161,62 @@ ylim([0, 100]);
 hold off;
 
 % ─────────────────────────────────────────────────────────────────────
-% Subplot 6: Total BSR Count (Stacked Bar - 대표 케이스만)
+% Subplot 6: Total BSR Count (Grouped Stacked Bar - 모든 ρ)
 % ─────────────────────────────────────────────────────────────────────
 subplot(3, 2, 6);
 
-% L_cell별로 ρ=0.5 케이스만 표시 (예시)
-if n_rho >= 2
-    rho_idx = 2;  % ρ=0.5 (두 번째)
-    
-    bar_data = [mean_explicit_bsr(:, rho_idx), mean_implicit_bsr(:, rho_idx)];
-    b = bar(bar_data, 'stacked');
-    
-    b(1).FaceColor = [0.9, 0.3, 0.3];  % Explicit: 빨강
-    b(2).FaceColor = [0.3, 0.6, 0.9];  % Implicit: 파랑
-    
-    set(gca, 'XTickLabel', arrayfun(@(x) sprintf('%.1f', x), L_cell_range, 'UniformOutput', false));
-    
-    grid on;
-    xlabel('L_{cell}', 'FontSize', 12);
-    ylabel('BSR Count', 'FontSize', 12);
-    title(sprintf('BSR Breakdown (\\rho=%.1f)', rho_range(rho_idx)), ...
-        'FontSize', 14, 'FontWeight', 'bold');
-    legend({'Explicit BSR', 'Implicit BSR'}, 'Location', 'northwest');
-else
-    text(0.5, 0.5, 'N/A', 'HorizontalAlignment', 'center');
+% L_cell × ρ 조합을 X축에 배치
+n_L = length(L_cell_range);
+n_rho = length(rho_range);
+
+% 데이터 재구성: 각 (L_cell, ρ) 조합에 대해 Stacked Bar
+x_positions = [];
+explicit_data = [];
+implicit_data = [];
+x_labels = {};
+
+x_pos = 0;
+for i = 1:n_L
+    for j = 1:n_rho
+        x_pos = x_pos + 1;
+        x_positions(end+1) = x_pos;
+        explicit_data(end+1) = mean_explicit_bsr(i, j);
+        implicit_data(end+1) = mean_implicit_bsr(i, j);
+        x_labels{end+1} = sprintf('L=%.1f,\\rho=%.1f', L_cell_range(i), rho_range(j));
+    end
+    x_pos = x_pos + 0.5;  % 그룹 간격
+end
+
+% Stacked Bar 생성
+bar_data = [explicit_data', implicit_data'];
+b = bar(x_positions, bar_data, 'stacked', 'BarWidth', 0.8);
+
+b(1).FaceColor = [0.9, 0.3, 0.3];  % Explicit: 빨강
+b(2).FaceColor = [0.3, 0.6, 0.9];  % Implicit: 파랑
+
+% L_cell 그룹 구분선 추가
+hold on;
+for i = 1:n_L-1
+    sep_pos = i * n_rho + i * 0.5 + 0.25;
+    xline(sep_pos, 'k--', 'LineWidth', 1.5);
+end
+hold off;
+
+set(gca, 'XTick', x_positions);
+set(gca, 'XTickLabel', x_labels, 'FontSize', 8);
+xtickangle(45);
+
+grid on;
+ylabel('BSR Count', 'FontSize', 12);
+title('BSR Breakdown (모든 조합)', 'FontSize', 14, 'FontWeight', 'bold');
+legend({'Explicit BSR', 'Implicit BSR'}, 'Location', 'northwest');
+
+% L_cell 그룹 레이블 추가 (subplot 하단)
+for i = 1:n_L
+    group_center = (i-1) * (n_rho + 0.5) + n_rho/2 + 0.5;
+    text(group_center, -max(explicit_data + implicit_data) * 0.15, ...
+        sprintf('L_{cell}=%.1f', L_cell_range(i)), ...
+        'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 10);
 end
 
 % ─────────────────────────────────────────────────────────────────────
