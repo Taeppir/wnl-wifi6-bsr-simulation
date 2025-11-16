@@ -1,9 +1,9 @@
 function save_experiment_results(results_grid, exp_config)
 % SAVE_EXPERIMENT_RESULTS: 실험 결과를 MAT + CSV 형식으로 저장
 %
-% [수정]
-%   - 2D 스윕 시 meshgrid 대신 명시적 인덱싱으로 변경
-%   - CSV 행 순서가 results_grid와 정확히 일치하도록 보장
+% [수정 v4 - 최종]
+%   - 2D 스윕: summary를 무조건 2D matrix로 유지
+%   - num_runs=1이든 10이든 동일하게 처리
 
     fprintf('[결과 저장]\n');
     
@@ -26,14 +26,38 @@ function save_experiment_results(results_grid, exp_config)
     summary.std = struct();
     
     metric_names = fieldnames(results_grid);
+    is_2d = isfield(exp_config, 'sweep_var2');
     
     for i = 1:length(metric_names)
         metric = metric_names{i};
         data = results_grid.(metric);
         
-        % 마지막 차원(runs)에서 평균/표준편차
-        summary.mean.(metric) = mean(data, ndims(data), 'omitnan');
-        summary.std.(metric) = std(data, 0, ndims(data), 'omitnan');
+        % ⭐ [핵심] 2D 스윕인 경우 무조건 2D 형태 유지
+        if is_2d
+            % data 크기: [n1, n2] 또는 [n1, n2, runs]
+            data_size = size(data);
+            
+            if ndims(data) == 3
+                % 3D: 마지막 차원에서 평균
+                summary.mean.(metric) = mean(data, 3, 'omitnan');
+                summary.std.(metric) = std(data, 0, 3, 'omitnan');
+            elseif ndims(data) == 2
+                % 2D: runs=1인 경우, 그대로 사용
+                summary.mean.(metric) = data;
+                summary.std.(metric) = zeros(size(data));
+            else
+                error('Unexpected data dimension for metric: %s', metric);
+            end
+        else
+            % 1D 스윕
+            if ndims(data) == 2
+                summary.mean.(metric) = mean(data, 2, 'omitnan');
+                summary.std.(metric) = std(data, 0, 2, 'omitnan');
+            else
+                summary.mean.(metric) = data;
+                summary.std.(metric) = zeros(size(data));
+            end
+        end
     end
     
     %% =====================================================================
@@ -62,25 +86,21 @@ function save_experiment_results(results_grid, exp_config)
     fprintf('  ✓ MAT 저장: %s\n', mat_filename);
     
     %% =====================================================================
-    %  4. CSV 파일 저장 (summary만) - 수정
+    %  4. CSV 파일 저장 (summary만)
     %  =====================================================================
-    
-    % 1D 또는 2D?
-    is_2d = isfield(exp_config, 'sweep_var2');
     
     if is_2d
         % ─────────────────────────────────────────────────────────
-        % [수정] 2D: meshgrid 대신 명시적 인덱싱 사용
+        % 2D: summary는 [n1, n2] 형태 보장됨
         % ─────────────────────────────────────────────────────────
         n1 = length(exp_config.sweep_range);
         n2 = length(exp_config.sweep_range2);
+        num_rows = n1 * n2;
         
         % 테이블 생성
-        num_rows = n1 * n2;
         T = table();
         
-        % [수정] 스윕 변수 열을 results_grid와 동일한 순서로 생성
-        % run_sweep_experiment.m의 for i1 = 1:n1, for i2 = 1:n2 순서와 일치
+        % 스윕 변수 열 생성
         var1_values = zeros(num_rows, 1);
         var2_values = zeros(num_rows, 1);
         
@@ -96,19 +116,31 @@ function save_experiment_results(results_grid, exp_config)
         T.(exp_config.sweep_var) = var1_values;
         T.(exp_config.sweep_var2) = var2_values;
         
-        % 메트릭 열 (mean, std)
+        % ⭐ 메트릭 열 추가 (2D → 1D 변환)
         for i = 1:length(metric_names)
             metric = metric_names{i};
             mean_data = summary.mean.(metric);  % [n1, n2]
             std_data = summary.std.(metric);    % [n1, n2]
             
-            % [수정] Column-major 순서로 변환 (i1, i2 순서와 일치)
-            T.([metric '_mean']) = mean_data(:);
-            T.([metric '_std']) = std_data(:);
+            % 2D를 1D로 변환 (row-by-row)
+            mean_vector = zeros(num_rows, 1);
+            std_vector = zeros(num_rows, 1);
+            
+            row_idx = 0;
+            for i1 = 1:n1
+                for i2 = 1:n2
+                    row_idx = row_idx + 1;
+                    mean_vector(row_idx) = mean_data(i1, i2);
+                    std_vector(row_idx) = std_data(i1, i2);
+                end
+            end
+            
+            T.([metric '_mean']) = mean_vector;
+            T.([metric '_std']) = std_vector;
         end
         
     else
-        % 1D: 각 행 = (val, metric_mean, metric_std, ...)
+        % 1D 스윕
         n1 = length(exp_config.sweep_range);
         
         T = table();
@@ -129,23 +161,5 @@ function save_experiment_results(results_grid, exp_config)
     writetable(T, csv_filename);
     fprintf('  ✓ CSV 저장: %s\n', csv_filename);
     
-    % %% =====================================================================
-    % %  5. [추가] CSV 저장 검증 (2D만)
-    % %  =====================================================================
-    
-    % if is_2d
-    %     fprintf('\n  [CSV 검증] 첫 3행 샘플:\n');
-    %     disp(T(1:min(3, height(T)), :));
-        
-    %     % 예상 순서 출력
-    %     fprintf('  예상 순서: (L_cell, rho) = ');
-    %     for i1 = 1:min(3, n1)
-    %         for i2 = 1:min(2, n2)
-    %             fprintf('(%.1f, %.1f) ', exp_config.sweep_range(i1), exp_config.sweep_range2(i2));
-    %         end
-    %     end
-    %     fprintf('...\n');
-    % end
-    
-    % fprintf('\n');
+    fprintf('\n');
 end
