@@ -64,7 +64,9 @@ function cfg = config_default()
     
     cfg.alpha = 1.5;
     cfg.mu_on = 0.05;
-    cfg.mu_off = 0.05;
+    cfg.rho = 0.7;
+    cfg.mu_off = cfg.mu_on * (1 - cfg.rho) / cfg.rho;
+
     cfg.L_cell = 0.3;
     cfg = recompute_pareto_lambda(cfg);
     total_capacity = cfg.numRU_SA * cfg.data_rate_per_RU;

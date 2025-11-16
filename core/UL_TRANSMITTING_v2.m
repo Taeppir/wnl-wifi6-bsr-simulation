@@ -247,6 +247,12 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
         
         if STAs(sta_idx).queue_size == 0
             [STAs, AP] = DELETE_BSR_AND_MODE(STAs, AP, sta_idx);
+
+            % ⭐⭐⭐ [추가] Non-empty → Empty 전환: 빈 시간 측정 시작
+            if ~STAs(sta_idx).is_buffer_currently_empty
+                STAs(sta_idx).buffer_empty_start_time = tx_complete_time;
+                STAs(sta_idx).is_buffer_currently_empty = true;
+            end
         end
         
     end  % End of SA-RU loop

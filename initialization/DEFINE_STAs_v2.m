@@ -49,6 +49,11 @@ function STAs = DEFINE_STAs_v2(numSTAs, OCWmin, cfg)
         % BSR 관련
         STAs(i).Q_prev = 0;              % 이전 큐 크기
         STAs(i).reported_bsr = 0;        % 마지막 보고한 BSR
+
+        % ⭐ [추가] 버퍼 Empty 시간 추적
+        STAs(i).buffer_empty_start_time = 0;     % 버퍼가 비기 시작한 시각
+        STAs(i).total_buffer_empty_time = 0;     % 누적 빈 시간 [sec]
+        STAs(i).is_buffer_currently_empty = true; % 초기 상태: 비어있음
         
         % v3 정책용 (EMA)
         STAs(i).Q_ema = 0;

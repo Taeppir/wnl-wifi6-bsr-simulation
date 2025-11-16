@@ -21,7 +21,8 @@ function exp_config = get_exp1_01_config()
     %  =====================================================================
     
     exp_config.sweep_var = 'L_cell';
-    exp_config.sweep_range = [0.1, 0.15,  0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+    % exp_config.sweep_range = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6];
+    exp_config.sweep_range = [0.1, 0.3, 0.5, 0.7];
     
     %% =====================================================================
     %  고정 파라미터
@@ -39,11 +40,9 @@ function exp_config = get_exp1_01_config()
     
     % Traffic (Pareto On-Off)
     exp_config.fixed.alpha = 1.5;      % Pareto shape
-    exp_config.fixed.rho = 0.7;        % On-state ratio
+    exp_config.fixed.rho = 0.5;        % On-state ratio
     exp_config.fixed.mu_on = 0.05;     % 50ms On period
 
-    exp_config.fixed.mu_off = exp_config.fixed.mu_on * (1 - exp_config.fixed.rho) / exp_config.fixed.rho;
-    
     % Simulation
     exp_config.fixed.simulation_time = 10.0;
     exp_config.fixed.warmup_time = 0.0;

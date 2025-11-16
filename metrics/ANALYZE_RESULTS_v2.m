@@ -169,6 +169,30 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     end
     
     results.bsr = struct();
+
+    % ⭐⭐⭐ [추가] 시간 기반 buffer_empty_ratio 계산
+    total_empty_time = 0;
+    for i = 1:length(STAs)
+        % 시뮬레이션 종료 시점에 아직 비어있는 경우 처리
+        if STAs(i).is_buffer_currently_empty && STAs(i).buffer_empty_start_time > 0
+            final_empty_duration = metrics.cumulative.simulation_end_time - STAs(i).buffer_empty_start_time;
+            STAs(i).total_buffer_empty_time = STAs(i).total_buffer_empty_time + final_empty_duration;
+        end
+        
+        total_empty_time = total_empty_time + STAs(i).total_buffer_empty_time;
+    end
+
+    % 실제 측정 시간 (워밍업 제외)
+    actual_sim_time = metrics.cumulative.simulation_end_time - cfg.warmup_time;
+    total_sim_time = cfg.num_STAs * actual_sim_time;
+
+    if total_sim_time > 0
+        results.bsr.buffer_empty_ratio = total_empty_time / total_sim_time;
+        results.bsr.buffer_empty_time_per_sta = total_empty_time / cfg.num_STAs;
+    else
+        results.bsr.buffer_empty_ratio = NaN;
+        results.bsr.buffer_empty_time_per_sta = NaN;
+    end
     
     % Explicit vs Implicit BSR
     results.bsr.total_explicit = metrics.cumulative.total_explicit_bsr;
@@ -255,75 +279,75 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.bsr.num_overhead_samples = 0;
     end
 
-    % [개선] BSR 대기 발생 패킷 비율 (Metric A)
-    total_completed_pkts = metrics.cumulative.total_completed_pkts;
-    if total_completed_pkts > 0
-        results.bsr.bsr_affected_packet_ratio = results.bsr.num_uora_samples / total_completed_pkts;
-    else
-        results.bsr.bsr_affected_packet_ratio = NaN;
-    end
+    % % [개선] BSR 대기 발생 패킷 비율 (Metric A)
+    % total_completed_pkts = metrics.cumulative.total_completed_pkts;
+    % if total_completed_pkts > 0
+    %     results.bsr.bsr_affected_packet_ratio = results.bsr.num_uora_samples / total_completed_pkts;
+    % else
+    %     results.bsr.bsr_affected_packet_ratio = NaN;
+    % end
 
-    if cfg.collect_bsr_trace
-        % 버퍼 비어 있는 비율 계산 (Q=0인 샘플 수 / 전체 샘플 수)
-        if metrics.policy_level.trace_idx > 0
-            valid_trace_idx = 1:metrics.policy_level.trace_idx;
-            Q_samples = metrics.policy_level.trace.Q(valid_trace_idx);
-            Q_samples = Q_samples(~isnan(Q_samples));
+    % if cfg.collect_bsr_trace
+    %     % 버퍼 비어 있는 비율 계산 (Q=0인 샘플 수 / 전체 샘플 수)
+    %     if metrics.policy_level.trace_idx > 0
+    %         valid_trace_idx = 1:metrics.policy_level.trace_idx;
+    %         Q_samples = metrics.policy_level.trace.Q(valid_trace_idx);
+    %         Q_samples = Q_samples(~isnan(Q_samples));
 
-            if ~isempty(Q_samples)
-                empty_count = sum(Q_samples == 0);
-                results.bsr.buffer_empty_count = empty_count;
-                results.bsr.buffer_empty_ratio = empty_count / numel(Q_samples);
-            else
-                results.bsr.buffer_empty_count = 0;
-                results.bsr.buffer_empty_ratio = NaN;
-            end
-        else
-            results.bsr.buffer_empty_count = 0;
-            results.bsr.buffer_empty_ratio = NaN;
-        end
+    %         if ~isempty(Q_samples)
+    %             empty_count = sum(Q_samples == 0);
+    %             results.bsr.buffer_empty_count = empty_count;
+    %             results.bsr.buffer_empty_ratio = empty_count / numel(Q_samples);
+    %         else
+    %             results.bsr.buffer_empty_count = 0;
+    %             results.bsr.buffer_empty_ratio = NaN;
+    %         end
+    %     else
+    %         results.bsr.buffer_empty_count = 0;
+    %         results.bsr.buffer_empty_ratio = NaN;
+    %     end
 
-        if metrics.policy_level.policy_idx > 0
-            valid_policy_idx = 1:metrics.policy_level.policy_idx;
+    %     if metrics.policy_level.policy_idx > 0
+    %         valid_policy_idx = 1:metrics.policy_level.policy_idx;
 
-            bsr_errors = metrics.policy_level.bsr_errors(valid_policy_idx);
-            bsr_errors = bsr_errors(~isnan(bsr_errors));
+    %         bsr_errors = metrics.policy_level.bsr_errors(valid_policy_idx);
+    %         bsr_errors = bsr_errors(~isnan(bsr_errors));
 
-            if ~isempty(bsr_errors)
-                results.bsr.mean_error = mean(bsr_errors);
-                results.bsr.median_error = median(bsr_errors);
-                results.bsr.p90_error = prctile(bsr_errors, 90);
+    %         if ~isempty(bsr_errors)
+    %             results.bsr.mean_error = mean(bsr_errors);
+    %             results.bsr.median_error = median(bsr_errors);
+    %             results.bsr.p90_error = prctile(bsr_errors, 90);
 
-                % 감소 적용 빈도
-                reduction_flags = metrics.policy_level.reduction_applied(valid_policy_idx);
-                results.bsr.reduction_frequency = sum(reduction_flags) / length(reduction_flags);
+    %             % 감소 적용 빈도
+    %             reduction_flags = metrics.policy_level.reduction_applied(valid_policy_idx);
+    %             results.bsr.reduction_frequency = sum(reduction_flags) / length(reduction_flags);
 
-                % 정책 안정성 (R=Q ↔ R<Q 전환 횟수)
-                results.bsr.stability_switches = metrics.policy_level.stability_switches;
-            else
-                results.bsr.mean_error = NaN;
-                results.bsr.median_error = NaN;
-                results.bsr.p90_error = NaN;
-                results.bsr.reduction_frequency = NaN;
-                results.bsr.stability_switches = 0;
-            end
-        else
-            results.bsr.mean_error = NaN;
-            results.bsr.median_error = NaN;
-            results.bsr.p90_error = NaN;
-            results.bsr.reduction_frequency = NaN;
-            results.bsr.stability_switches = 0;
-        end
-    else
-        % BSR 추적 비활성화
-        results.bsr.buffer_empty_count = NaN;
-        results.bsr.buffer_empty_ratio = NaN;
-        results.bsr.mean_error = NaN;
-        results.bsr.median_error = NaN;
-        results.bsr.p90_error = NaN;
-        results.bsr.reduction_frequency = NaN;
-        results.bsr.stability_switches = 0;
-    end
+    %             % 정책 안정성 (R=Q ↔ R<Q 전환 횟수)
+    %             results.bsr.stability_switches = metrics.policy_level.stability_switches;
+    %         else
+    %             results.bsr.mean_error = NaN;
+    %             results.bsr.median_error = NaN;
+    %             results.bsr.p90_error = NaN;
+    %             results.bsr.reduction_frequency = NaN;
+    %             results.bsr.stability_switches = 0;
+    %         end
+    %     else
+    %         results.bsr.mean_error = NaN;
+    %         results.bsr.median_error = NaN;
+    %         results.bsr.p90_error = NaN;
+    %         results.bsr.reduction_frequency = NaN;
+    %         results.bsr.stability_switches = 0;
+    %     end
+    % else
+    %     % BSR 추적 비활성화
+    %     results.bsr.buffer_empty_count = NaN;
+    %     results.bsr.buffer_empty_ratio = NaN;
+    %     results.bsr.mean_error = NaN;
+    %     results.bsr.median_error = NaN;
+    %     results.bsr.p90_error = NaN;
+    %     results.bsr.reduction_frequency = NaN;
+    %     results.bsr.stability_switches = 0;
+    % end
 
 
     
@@ -444,6 +468,9 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     
     % BSR
     results.summary.implicit_bsr_ratio = results.bsr.implicit_ratio;
+    results.summary.explicit_bsr_count = results.bsr.total_explicit;
+    results.summary.implicit_bsr_count = results.bsr.total_implicit;
+    results.summary.total_bsr_count = results.bsr.total_bsr;
     if isfield(results.bsr, 'buffer_empty_ratio')
         results.summary.buffer_empty_ratio = results.bsr.buffer_empty_ratio;
     else
