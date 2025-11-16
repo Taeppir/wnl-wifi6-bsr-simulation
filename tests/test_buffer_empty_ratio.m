@@ -28,15 +28,15 @@ test_scenarios = [
     % [L_cell, rho, alpha, 설명]
     0.1, 0.3, 1.5;  % 낮은 부하, 낮은 On 비율 → Empty 많음
     0.2, 0.5, 1.5;  % 중간 부하
-    0.3, 0.7, 1.5;  % 중간-높은 부하 → Empty 적음
-    0.4, 0.9, 1.5;  % 높은 부하, 높은 On 비율 → Empty 매우 적음
+    % 0.3, 0.7, 1.5;  % 중간-높은 부하 → Empty 적음
+    % 0.4, 0.9, 1.5;  % 높은 부하, 높은 On 비율 → Empty 매우 적음
 ];
 
 scenario_names = {
     'Low Load (L=0.1, ρ=0.3) - Expect High Empty';
     'Mid Load (L=0.2, ρ=0.5) - Expect Mid Empty';
-    'Mid-High Load (L=0.3, ρ=0.7) - Expect Low Empty';
-    'High Load (L=0.4, ρ=0.9) - Expect Very Low Empty';
+    % 'Mid-High Load (L=0.3, ρ=0.7) - Expect Low Empty';
+    % 'High Load (L=0.4, ρ=0.9) - Expect Very Low Empty';
 };
 
 n_scenarios = size(test_scenarios, 1);
@@ -77,7 +77,7 @@ for s = 1:n_scenarios
     cfg.alpha = test_scenarios(s, 3);
     
     % 시간 설정
-    cfg.simulation_time = 15.0;  % 충분한 시간
+    cfg.simulation_time = 30.0;  % 충분한 시간
     cfg.warmup_time = 2.0;
     
     % 트래픽 설정

@@ -468,6 +468,9 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
     
     % BSR
     results.summary.implicit_bsr_ratio = results.bsr.implicit_ratio;
+    results.summary.explicit_bsr_count = results.bsr.total_explicit;
+    results.summary.implicit_bsr_count = results.bsr.total_implicit;
+    results.summary.total_bsr_count = results.bsr.total_bsr;
     if isfield(results.bsr, 'buffer_empty_ratio')
         results.summary.buffer_empty_ratio = results.bsr.buffer_empty_ratio;
     else

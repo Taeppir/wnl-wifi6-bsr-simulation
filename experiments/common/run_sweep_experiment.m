@@ -70,6 +70,9 @@ function results_grid = run_sweep_experiment(exp_config)
         'mean_sched_delay_ms'
         'mean_frag_delay_ms'
         'mean_overhead_delay_ms'
+        'explicit_bsr_count'
+        'implicit_bsr_count'
+        'total_bsr_count'
     };
     
     results_grid = struct();
