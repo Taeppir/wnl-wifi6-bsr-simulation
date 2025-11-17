@@ -50,7 +50,7 @@ function exp_config = get_exp2_01_config()
     
     % Scenario B (Mid-load)
     exp_config.scenarios(2).name = 'Mid';
-    exp_config.scenarios(2).L_cell = 0.35;
+    exp_config.scenarios(2).L_cell = 0.30;
     exp_config.scenarios(2).rho = 0.7;
     exp_config.scenarios(2).mu_on = 0.05;
     exp_config.scenarios(2).alpha = 1.5;
@@ -96,13 +96,17 @@ function exp_config = get_exp2_01_config()
     %  반복 횟수
     %  =====================================================================
     
-    exp_config.num_runs = 10;
+    exp_config.num_runs = 3;
     
     %% =====================================================================
     %  스킴별 파라미터 (초기값)
     %  =====================================================================
-    
+
+    exp_config.fixed.burst_threshold = 1000; 
+    exp_config.fixed.reduction_threshold = 500; 
+
     % Scheme 1 파라미터
+
     exp_config.fixed.v1_fixed_reduction_bytes = 500;
     exp_config.fixed.v1_sensitivity = 1.0;
     

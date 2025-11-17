@@ -145,21 +145,25 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             % T_overhead 계산 및 저장
             T_first_tx = tx_start_time;
             T_ru_assigned = STAs(sta_idx).last_ru_assigned_time;
+            queue_entry = STAs(sta_idx).Queue(head_idx);
+            decomp_ref = queue_entry.delay_decomp_ref;
 
-            if T_ru_assigned > 0 % 유효한 타임스탬프가 있는 경우만
-                T_overhead = T_first_tx - T_ru_assigned;
+            if queue_entry.is_bsr_wait_packet && ~isnan(decomp_ref)
+                if T_ru_assigned > 0 % 유효한 타임스탬프가 있는 경우만
+                    T_overhead = T_first_tx - T_ru_assigned;
 
-                % delay_decomp_idx는 RECEIVING_TF에서 이미 증가했으므로
-                % 현재 인덱스 그대로 사용
-                idx = STAs(sta_idx).delay_decomp_idx;
-                
-                if idx > 0 && idx <= length(STAs(sta_idx).overhead_delays)
-                    STAs(sta_idx).overhead_delays(idx) = T_overhead;
+                    if decomp_ref > 0 && decomp_ref <= length(STAs(sta_idx).overhead_delays)
+                            STAs(sta_idx).overhead_delays(decomp_ref) = T_overhead;
+                    else
+                        warning('STA %d: overhead_delays 인덱스(%d) 범위 초과', sta_idx, decomp_ref);
+                    end
                 else
-                    warning('STA %d: overhead_delays 인덱스(%d) 범위 초과', sta_idx, idx);
+                    warning('STA %d: last_ru_assigned_time이 기록되지 않음 (T_overhead 계산 불가)', sta_idx);
+                
+                    if queue_entry.is_bsr_wait_packet
+                        warning('STA %d: delay_decomp_ref가 설정되지 않아 T_{overhead} 기록 불가', sta_idx);
+                    end
                 end
-            else
-                warning('STA %d: last_ru_assigned_time이 기록되지 않음 (T_overhead 계산 불가)', sta_idx);
             end
         end
         
@@ -201,8 +205,8 @@ function [STAs, AP, RUs, tx_log, metrics] = UL_TRANSMITTING_v2(STAs, AP, RUs, tx
             completed_pkt_info.is_bsr_wait_packet = pkt.is_bsr_wait_packet;
 
             % T_overhead도 completed_pkt_info에 포함
-            if pkt.is_bsr_wait_packet
-                idx = STAs(sta_idx).delay_decomp_idx;
+            if pkt.is_bsr_wait_packet && ~isnan(pkt.delay_decomp_ref)
+                idx = pkt.delay_decomp_ref;
                 if idx > 0 && idx <= length(STAs(sta_idx).overhead_delays)
                     completed_pkt_info.overhead_delay = STAs(sta_idx).overhead_delays(idx);
                 else
