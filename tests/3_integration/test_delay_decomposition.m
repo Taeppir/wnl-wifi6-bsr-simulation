@@ -95,9 +95,13 @@ try
     t_ru_assigned = current_time; % T_ru_assigned
     
     STAs = RECEIVING_TF(STAs, RUs, AP, cfg, t_ru_assigned);
-    
+
     sta1 = STAs(sta_idx);
     assert(sta1.delay_decomp_idx == 1, '지연 분해 인덱스 증가 실패');
+
+    head_idx = sta1.queue_head;
+    assert(sta1.Queue(head_idx).delay_decomp_ref == sta1.delay_decomp_idx, ...
+        '큐 헤드에 delay_decomp_ref 연결 실패');
     
     % 계산된 지연 값 (로그 출력용)
     t_uora = sta1.uora_delays(1);
@@ -126,6 +130,9 @@ try
     if idx > 0
         t_overhead_recorded = sta1.overhead_delays(idx);
         t_overhead_expected = t_first_tx_p1 - t_ru_assigned;  % 0.7 - 0.6 = 0.1
+
+        assert(sta1.Queue(sta1.queue_head).delay_decomp_ref == idx, ...
+            'P1 큐 엔트리 delay_decomp_ref 손실');
         
         assert(abs(t_overhead_recorded - t_overhead_expected) < 1e-9, 'T_overhead 기록 실패');
         fprintf('  - PASS: T_overhead 기록 (%.2f s)\n', t_overhead_recorded);

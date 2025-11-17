@@ -279,13 +279,13 @@ function results = ANALYZE_RESULTS_v2(STAs, AP, metrics, cfg)
         results.bsr.num_overhead_samples = 0;
     end
 
-    % % [개선] BSR 대기 발생 패킷 비율 (Metric A)
-    % total_completed_pkts = metrics.cumulative.total_completed_pkts;
-    % if total_completed_pkts > 0
-    %     results.bsr.bsr_affected_packet_ratio = results.bsr.num_uora_samples / total_completed_pkts;
-    % else
-    %     results.bsr.bsr_affected_packet_ratio = NaN;
-    % end
+    % [개선] BSR 대기 발생 패킷 비율 (Metric A)
+    total_completed_pkts = metrics.cumulative.total_completed_pkts;
+    if total_completed_pkts > 0
+        results.bsr.bsr_affected_packet_ratio = results.bsr.num_uora_samples / total_completed_pkts;
+    else
+        results.bsr.bsr_affected_packet_ratio = NaN;
+    end
 
     % if cfg.collect_bsr_trace
     %     % 버퍼 비어 있는 비율 계산 (Q=0인 샘플 수 / 전체 샘플 수)
