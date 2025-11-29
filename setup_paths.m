@@ -17,6 +17,7 @@ folders = {
     'config/experiment_configs'
     'experiments'
     'experiments/common'
+    'experiments/phase0'
     'experiments/phase1'
     'experiments/phase2'
     'initialization'
