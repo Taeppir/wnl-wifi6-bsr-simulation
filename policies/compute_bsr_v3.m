@@ -45,7 +45,6 @@ function [R, STAs] = compute_bsr_v3(STAs, sta_idx, Q_current, cfg)
     %  =====================================================================
     
     % EMA 공식: Q_ema(t) = α·Q(t) + (1-α)·Q_ema(t-1)
-    % (참고: policies/update_ema_helper.m와 동일한 로직)
     Q_ema_new = alpha * Q_current + (1 - alpha) * Q_ema;
     
     %% =====================================================================
