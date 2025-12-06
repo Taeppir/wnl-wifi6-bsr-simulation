@@ -20,6 +20,7 @@ folders = {
     'experiments/phase0'
     'experiments/phase1'
     'experiments/phase2'
+    'experiments/phase2/exp2_03_v3_optimization'
     'initialization'
     'metrics'
     'policies'
