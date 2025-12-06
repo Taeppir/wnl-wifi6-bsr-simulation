@@ -79,6 +79,15 @@ function STAs = RECEIVING_TF(STAs, RUs, AP, cfg, current_time)
                     STAs(i).uora_delays(idx) = T_uora;
                     STAs(i).sched_delays(idx) = T_sched;
                     STAs(i).delay_decomp_idx = idx;
+
+                    % 지연 분해 인덱스를 큐 헤드 패킷에 연결
+                    if STAs(i).queue_size > 0
+                        head_idx = STAs(i).queue_head;
+                        STAs(i).Queue(head_idx).delay_decomp_ref = idx;
+                    else
+                        warning('STA %d: 큐가 비어 있어 delay_decomp_ref를 기록할 수 없음', i);
+                    end
+                    
                 else
                     warning('STA %d: 지연 분해(delay_decomp) 배열 크기 초과', i);
                 end
