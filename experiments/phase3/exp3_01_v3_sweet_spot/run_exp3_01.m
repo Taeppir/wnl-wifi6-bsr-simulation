@@ -167,7 +167,7 @@ for i_scheme = 1:n_schemes
                     cfg = recompute_pareto_lambda(cfg);
                     
                     % 난수 시드
-                    seed = 1000 + i_scheme*10000 + (i_L-1)*100 + (i_RA-1)*10 + i_STA + run*1000;
+                    seed = 1000 + (i_L-1)*100 + (i_RA-1)*10 + i_STA + run*1000;
                     rng(seed);
                     
                     % ─────────────────────────────────────────
