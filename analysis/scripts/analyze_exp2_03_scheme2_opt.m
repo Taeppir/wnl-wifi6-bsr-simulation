@@ -1,10 +1,10 @@
-%% analyze_exp2_02_scheme1_opt.m
-% Experiment 2-2: Scheme 1 파라미터 최적화 분석
+%% analyze_exp2_03_scheme2_opt.m
+% Experiment 2-3: Scheme 2 파라미터 최적화 분석
 
 clear; close all; clc;
 
 fprintf('========================================\n');
-fprintf('  Exp 2-2: Scheme 1 최적화 분석\n');
+fprintf('  Exp 2-3: Scheme 2 최적화 분석\n');
 fprintf('========================================\n\n');
 
 %% =====================================================================
